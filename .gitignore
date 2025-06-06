@@ -1,4 +1,5 @@
 __pycache__/
+backend/temporary_local_files/
 *.py[cod]
 **/.env
 .venv/
