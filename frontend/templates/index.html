@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Hello!</h1>
+<a href="/create">Create a new parent vial</a>
+<form>
+    <div>
+        <input id="barcode" required>
+        <button type="button" id="search_barcode">Search</button>
+    </div>
+</form>
+<form action="/parent">
+    <input type="text" name="parent_barcode">
+    <input type="submit">
+</form>
+{% endblock %}

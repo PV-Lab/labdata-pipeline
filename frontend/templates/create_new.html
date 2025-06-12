@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block body %}
+<div>
+    Executer: <input id="executer" type="text">
+</div>
+<div>
+    Parent vial barcode: <input id="parent_barcode" type="text">
+</div>
+<div id="salts">
+    <h3>Add Salts</h3>
+<div id="salt_content">
+    <div class="salt">
+    <form>
+        <div>
+            Salt barcode: <button class="scan_salt_barcode">Scan</button>
+        </div>
+        <div>
+            Enter barcode manually: <input class="salt_barcode" type="text">
+            <button class="search_salt" onclick="search_salt_barcode(event)">Search</button>
+        </div>
+        <div>
+            Salt name: <input class="salt_name" type="text">
+        </div>
+        <div>
+            Chemical formula: <input class="salt_chem_form" type="text">
+        </div>
+        <div>
+            Molar mass (g/mol): <input class="salt_molar_mass" type="number">
+        </div>
+        <div>
+            Mass (g): <input class="salt_mass" type="number">
+        </div>
+    </form>
+    </div>
+</div>
+<button id="add_salt" onclick="add_salt(event)">Add Salt</button>
+</div>
+
+<div id="solvents">
+    <h3>Add Solvents</h3>
+    <div id="solvent_content">
+        <div class="solvent">
+            <form>
+                <div>
+                    Solvent barcode: <button class="scan_solvent_barcode">Scan</button>
+                </div>
+                <div>
+                    Enter barcode manually: <input class="solvent_barcode" type="text">
+                    <button class="search_solvent" onclick="search_solvent(event)">Search</button>
+                </div>
+                <div>
+                    Solvent name: <input class="solvent_name" type="text">
+                </div>
+                <div>
+                    Concentration: <input class="solvent_concentration" type="text">
+                </div>
+                <div>
+                    Volume added (ml): <input class="solvent_vol" type="number">
+                </div>
+                <div>
+                    Desired molarity: <input class="solvent_molarity" type="number">
+                </div>
+                <div>
+                    Ambient temperature (C): <input class="solvent_temp" type="number">
+                </div>
+                <div>
+                    Ambient humidity (%): <input class="solvent_humidity" type="number">
+                </div>
+                <div>
+                    Stir time (min): <input class="solvent_stir_time" type="number">
+                </div>
+            </form>
+        </div>
+    </div>
+    <button id="add_solvent" onclick="add_solvent(event)">Add Solvent</button>
+</div>
+<button id="save">Save to dropbox</button>
+
+{% endblock %}
