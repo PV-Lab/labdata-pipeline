@@ -1,16 +1,40 @@
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelector('#save').addEventListener('click', save_to_dropbox);
-});
-
 // Creates a new form to add an extra salt
 function add_salt(event) {
     const element = event.target;
     const parent_div = element.parentElement;
     const salt_content_div = parent_div.querySelector('#salt_content');
-    const initial_content = salt_content_div.querySelector('.salt').innerHTML;
     const new_salt_div = document.createElement('div');
     new_salt_div.className = "salt";
-    new_salt_div.innerHTML = initial_content;
+    new_salt_div.innerHTML = `
+    <form>
+        <div>
+            Salt barcode: <button class="scan_salt_barcode">Scan</button>
+        </div>
+        <div>
+            Enter barcode manually: <input class="salt_barcode" type="text" oninput="search_salt_barcode(event)">
+            <button class="search_salt" onclick="search_salt_barcode(event)">Search</button>
+        </div>
+        <div>
+            Salt name: <input class="salt_name" type="text">
+        </div>
+        <div>
+            Chemical formula: <input class="salt_chem_form" type="text">
+        </div>
+        <div>
+            Molar mass (g/mol): <input class="salt_molar_mass" type="number">
+        </div>
+        <div>
+            Mass (g): <input class="salt_mass" type="number">
+        </div>
+        <div>
+            Ambient temperature in GB (C): <input class="salt_ambient_temp" type="number">
+        </div>
+        <div>
+            Ambient humidity in GB (%): <input class="salt_ambient_humidity" type="number">
+        </div>
+    </form>
+    <hr>
+    `;
     salt_content_div.appendChild(new_salt_div);
 }
 
@@ -19,35 +43,73 @@ function add_solvent(event) {
     const element = event.target;
     const parent_div = element.parentElement;
     const solvent_content_div = parent_div.querySelector('#solvent_content');
-    const initial_content = solvent_content_div.querySelector('.solvent').innerHTML;
     const new_solvent_div = document.createElement('div');
     new_solvent_div.className = "solvent";
-    new_solvent_div.innerHTML = initial_content;
+    new_solvent_div.innerHTML = `
+            <form>
+                <div>
+                    Solvent barcode: <button class="scan_solvent_barcode">Scan</button>
+                </div>
+                <div>
+                    Enter barcode manually: <input class="solvent_barcode" type="text" oninput="search_solvent(event)">
+                    <button class="search_solvent" onclick="search_solvent(event)">Search</button>
+                </div>
+                <div>
+                    Solvent name: <input class="solvent_name" type="text">
+                </div>
+                <div>
+                    Concentration: <input class="solvent_concentration" type="text">
+                </div>
+                <div>
+                    Desired molarity: <input class="solvent_molarity" type="number">
+                </div>
+                <div>
+                    Volume added (ml): <input class="solvent_vol" type="number">
+                </div>
+                <div>
+                    Ambient temperature (C): <input class="solvent_temp" type="number">
+                </div>
+                <div>
+                    Ambient humidity (%): <input class="solvent_humidity" type="number">
+                </div>
+                <div>
+                    Stir time (min): <input class="solvent_stir_time" type="number">
+                </div>
+            </form>
+            <hr>
+        `;
     solvent_content_div.appendChild(new_solvent_div);
 }
 
-function save_to_dropbox() {
-    console.log('Hello');
+function create_parent_object() {
     const salts_div = document.querySelector('#salt_content');
     const solvents_div = document.querySelector('#solvent_content');
     const executer = document.querySelector('#executer').value;
     const barcode = document.querySelector('#parent_barcode').value;
-    let salt_index = 1;
-    let solvent_index = 1;
-    let salts = {};
-    let solvents = {};
+    const date = document.querySelector('#date').innerHTML;
+    let salts = [];
+    let solvents = [];
     salts_div.querySelectorAll('.salt').forEach(function(div) {
-        salts[salt_index] = {
+        if (div.querySelector('.salt_barcode').value === '') {
+            return;
+        }
+
+        salts.push({
             barcode: div.querySelector('.salt_barcode').value,
             name: div.querySelector('.salt_name').value,
             chemical_formula: div.querySelector('.salt_chem_form').value,
             molar_mass: div.querySelector('.salt_molar_mass').value,
-            mass: div.querySelector('.salt_mass').value
-        }
-        salt_index += 1;
+            mass: div.querySelector('.salt_mass').value,
+            ambient_temp: div.querySelector('.salt_ambient_temp').value,
+            ambient_humidity: div.querySelector('.salt_ambient_humidity').value,
+        });
     });
     solvents_div.querySelectorAll('.solvent').forEach(function(div) {
-        solvents[solvent_index] = {
+        if (div.querySelector('.solvent_barcode').value === '') {
+            return;
+        }
+
+        solvents.push({
             barcode: div.querySelector('.solvent_barcode').value,
             name: div.querySelector('.solvent_name').value,
             concentration: div.querySelector('.solvent_concentration').value,
@@ -56,27 +118,64 @@ function save_to_dropbox() {
             ambient_temp: div.querySelector('.solvent_temp').value,
             ambient_humidity: div.querySelector('.solvent_humidity').value,
             stir_time: div.querySelector('.solvent_stir_time').value
-        }
-        solvent_index += 1;
+        });
     });
-    console.log(salts);
-    console.log(solvents);
+    return {
+            date: date,
+            executer: executer,
+            barcode: barcode,
+            salts: salts,
+            solvents: solvents,
+        };
+}
+
+function save_to_dropbox() {
+    parent_object = create_parent_object();
     fetch('/create/parent', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            executer: executer,
-            barcode: barcode,
-            no_salts: salt_index -1,
-            salts: salts,
-            solvents: solvents,
-        })
+        body: JSON.stringify(parent_object)
     })
     .then((response) => response.json())
     .then((data) => {
-        console.log(data['message'])
+        console.log(data);
+        if (data.detail === 'Uploaded successfully') {
+            const message_div = document.querySelector('#message');
+            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+        } else {
+            const message_div = document.querySelector('#message');
+            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+        }
+    })
+    .catch((error) => {
+        console.log('Error', error)
+    })
+}
+
+function save_edit() {
+    parent_object = create_parent_object();
+    fetch('/edit/parent', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(parent_object)
+    })
+    .then((response) => response.json())
+    .then((data) => {
+        console.log(data);
+        if (data.detail === 'Uploaded successfully') {
+            const message_div = document.querySelector('#message');
+            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+        } else {
+            const message_div = document.querySelector('#message');
+            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+        }
+    })
+    .catch((error) => {
+        console.log('Error', error)
     })
 }
 
@@ -85,15 +184,17 @@ function search_salt_barcode(event) {
     target = event.target;
     barcode = target.parentElement.querySelector('.salt_barcode').value;
     parent_div = target.parentElement.parentElement
-    fetch(`/get_salt/${barcode}`)
-    .then((response) => response.json())
-    .then((data) => {
-        parent_div.querySelector('.salt_name').value = data['name'];
-        parent_div.querySelector('.salt_chem_form').value = data['chem_form'];
-    })
-    .catch((error) => {
-        console.log('Error', error)
-    })
+    if (barcode.length > 8) {
+        fetch(`/get_salt/${barcode}`)
+        .then((response) => response.json())
+        .then((data) => {
+            parent_div.querySelector('.salt_name').value = data['name'];
+            parent_div.querySelector('.salt_chem_form').value = data['chem_form'];
+        })
+        .catch((error) => {
+            console.log('Error', error)
+        })
+    };
 }
 
 function search_solvent(event) {
@@ -101,13 +202,15 @@ function search_solvent(event) {
     target = event.target;
     barcode = target.parentElement.querySelector('.solvent_barcode').value;
     parent_div = target.parentElement.parentElement
-    fetch(`/get_solvent/${barcode}`)
-    .then((response) => response.json())
-    .then((data) => {
-        parent_div.querySelector('.solvent_name').value = data['name'];
-        parent_div.querySelector('.solvent_concentration').value = data['concentration'];
-    })
-    .catch((error) => {
-        console.log('Error', error)
-    })
+    if (barcode.length > 8) {
+        fetch(`/get_solvent/${barcode}`)
+        .then((response) => response.json())
+        .then((data) => {
+            parent_div.querySelector('.solvent_name').value = data['name'];
+            parent_div.querySelector('.solvent_concentration').value = data['concentration'];
+        })
+        .catch((error) => {
+            console.log('Error', error)
+        })
+    }
 }

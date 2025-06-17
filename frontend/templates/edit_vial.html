@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block body %}
+<div>
+    Executer: <input id="executer" type="text" value="{{ executer }}" disabled>
+</div>
+<div>
+    Parent vial barcode: <input id="parent_barcode" type="text" value="{{ barcode | string }}" disabled>
+</div>
+<div>
+    Date Created: <strong><span id="date">{{date}}</span></strong>
+</div>
+<div id="salts">
+    <h3>Salts</h3>
+<div id="salt_content">
+    {% for salt in salts %}
+    <div class="salt">
+    <form>
+        <div>
+            Salt barcode: <input class="salt_barcode" type="text" value="{{ salt['barcode'] }}" disabled>
+        </div>
+        <div>
+            Salt name: <input class="salt_name" type="text" value="{{ salt['name'] }}" disabled>
+        </div>
+        <div>
+            Chemical formula: <input class="salt_chem_form" type="text" value="{{ salt['chemical_formula'] }}" disabled>
+        </div>
+        <div>
+            Molar mass (g/mol): <input class="salt_molar_mass" type="number" value="{{ salt['molar_mass'] }}" disabled>
+        </div>
+        <div>
+            Mass (g): <input class="salt_mass" type="number" value="{{ salt['mass'] }}" disabled>
+        </div>
+        <div>
+            Ambient temperature in GB (C): <input class="salt_ambient_temp" type="number" value="{{ salt['ambient_temp'] }}" disabled>
+        </div>
+        <div>
+            Ambient humidity in GB (%): <input
+            class="salt_ambient_humidity" type="number" value="{{ salt['ambient_humidity'] }}" disabled>
+        </div>
+    </form>
+    <hr>
+    </div>
+    {% endfor %}
+</div>
+<button id="add_salt" onclick="add_salt(event)">Add Salt</button>
+</div>
+
+<div id="solvents">
+    <h3>Solvents</h3>
+    <div id="solvent_content">
+        {% for solvent in solvents %}
+        <div class="solvent">
+            <form>
+                <div>
+                    Solvent barcode: <input class="solvent_barcode" type="text" value="{{ solvent['barcode'] }}" disabled>
+                </div>
+                <div>
+                    Solvent name: <input class="solvent_name" type="text" value="{{ solvent['name'] }}" disabled>
+                </div>
+                <div>
+                    Concentration: <input class="solvent_concentration" type="text" value="{{ solvent['concentration'] }}" disabled>
+                </div>
+                <div>
+                    Desired molarity: <input class="solvent_molarity" type="number" value="{{ solvent['desired_molarity'] }}" disabled>
+                </div>
+                <div>
+                    Volume added (ml): <input class="solvent_vol" type="number" value="{{ solvent['vol_added'] }}" disabled>
+                </div>
+                <div>
+                    Ambient temperature (C): <input class="solvent_temp" type="number" value="{{ solvent['ambient_temp'] }}" disabled>
+                </div>
+                <div>
+                    Ambient humidity (%): <input class="solvent_humidity" type="number" value="{{ solvent['ambient_humidity'] }}" disabled>
+                </div>
+                <div>
+                    Stir time (min): <input class="solvent_stir_time" type="number" value="{{ solvent['stir_time'] }}" disabled>
+                </div>
+            </form>
+            <hr>
+        </div>
+        {% endfor %}
+    </div>
+    <button id="add_solvent" onclick="add_solvent(event)">Add Solvent</button>
+</div>
+<div id="message"></div>
+<button id="save" onclick="save_edit()">Save to dropbox</button>
+
+{% endblock %}

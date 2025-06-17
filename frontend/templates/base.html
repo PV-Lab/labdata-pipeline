@@ -1,9 +1,51 @@
 <!DOCTYPE html>
 <head>
     <title>Lab data collection</title>
+    <link rel="stylesheet" href="https://unpkg.com/sakura.css/css/sakura.css" />
     <script src="/static/script.js"></script>
+      <style>
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 0.5rem;
+    }
+
+    nav a {
+      margin-right: 1rem;
+      text-decoration: none;
+    }
+
+    nav a:last-child {
+      margin-right: 0;
+    }
+
+    .nav-links {
+      display: flex;
+    }
+    blockquote.error {
+    border-left: 4px solid #e74c3c; /* bright red border */
+    background-color: #fcebea;      /* very light red/pink background */
+    color: #c0392b;                 /* dark red text */
+    padding: 1rem 1.5rem;
+    margin: 1.5rem 0;
+    font-style: normal;
+  }
+  </style>
 </head>
 <body>
-    {% block body %}
-    {% endblock %}
+    <nav>
+    <strong><a href="/">AMLS</a></strong>
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="/create">Create</a>
+      <a href="/edit">View</a>
+    </div>
+  </nav>
+    <div class="container">
+        {% block body %}
+        {% endblock %}
+    </div>
 </body>
