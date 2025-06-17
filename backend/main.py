@@ -11,6 +11,7 @@ import csv
 from datetime import datetime
 import pandas as pd
 from io import StringIO
+import numpy as np
 
 load_dotenv()
 
@@ -34,24 +35,27 @@ except:
 
 FIELDNAMES = ["Date", "Executer", "Salt name",
                   "Chemical formula", "Salt Molecular Weight in g/mol", "Mass of salt added in the vial in g",
+                  "Ambient temperature in glovebox (C)", "Ambient humidity in glovebox (%)",
                   "Barcode on the salt", "Name of the solvent", "Concentration of the solvent (%)",
-                  "Solvent Type", "Barcode on the solvent", "Vol of solvent added (ml)", "Desired molarity",
+                 "Barcode on the solvent", "Vol of solvent added (ml)", "Desired molarity",
                   "Ambient temperature (C)", "Ambient humidity (%)", "Stir Time (min)", "Barcode of Vial"]
 
-PROPERTIES_TO_FIELDMAMES = {'general': {'executer': "Executer", 'barcode': "Barcode of Vial",},
+PROPERTIES_TO_FIELDMAMES = {'general': {'executer': "Executer", 'barcode': "Barcode of Vial", 'date': "Date"},
                             'salts': {'name': "Salt name", 'barcode': "Barcode on the salt", "chemical_formula": "Chemical formula",
-                                    "molar_mass": "Salt Molecular Weight in g/mol", "mass": "Mass of salt added in the vial in g"},
-                            'solvents': {'barcode': "Barcode on the solvent", 'name': "Name of the solvent", 'concentation': "Concentration of the solvent (%)",
+                                    "molar_mass": "Salt Molecular Weight in g/mol", "mass": "Mass of salt added in the vial in g",
+                                    'ambient_temp': "Ambient temperature in glovebox (C)", 'ambient_humidity': "Ambient humidity in glovebox (%)"},
+                            'solvents': {'barcode': "Barcode on the solvent", 'name': "Name of the solvent", 'concentration': "Concentration of the solvent (%)",
                                          'vol_added': "Vol of solvent added (ml)", 'desired_molarity': "Desired molarity",
                                          'ambient_temp': "Ambient temperature (C)", 'ambient_humidity': "Ambient humidity (%)",
                                          'stir_time': "Stir Time (min)"}
                             }
 
 class Parent_vial(BaseModel):
+    date: str
     executer: str
     barcode: str
-    solvents: dict
-    salts: dict
+    solvents: list
+    salts: list
 
 
 class Salt(BaseModel):
@@ -60,6 +64,7 @@ class Salt(BaseModel):
     chemical_formula: str
     molar_mass: float
     mass: float
+    ambient_temp: float
 
 class Solvent(BaseModel):
     barcode: str
@@ -78,7 +83,14 @@ def upload_file(local_file_path, dropbox_file_path):
         dbx.files_upload(f.read(), dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
 
 def upload_csv_buffer(csv_buffer, dropbox_file_path):
-    dbx.files_upload(csv_buffer.getvalue().encode('utf-8'), dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
+    return dbx.files_upload(csv_buffer.getvalue().encode('utf-8'), dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
+
+def change_to_native_types(object):
+    if isinstance(object, np.int_):
+        return int(object)
+    if isinstance(object, np.float64):
+        return float(object)
+    return object
 
 @app.get('/get_salt/{salt_barcode}')
 def get_salt(salt_barcode: str):
@@ -87,7 +99,8 @@ def get_salt(salt_barcode: str):
         row_dict = row.iloc[0].fillna('').to_dict()
         return {'name': row_dict['Chemical Description'], 'chem_form': row_dict['Chemical Formula']}
     else:
-        raise HTTPException(status_code=400, detail={'detail': 'Salt barcode not found'})
+        raise HTTPException(status_code=400, detail='Salt barcode not found')
+
 
 
 @app.get('/get_solvent/{solvent_barcode}')
@@ -97,7 +110,7 @@ def get_solvent(solvent_barcode: str):
         row_dict = row.iloc[0].fillna('').to_dict()
         return {'name': row_dict['Chemical Description'], 'concentration': row_dict['Concentration']}
     else:
-        raise HTTPException(status_code=400, detail={'detail': 'Salt barcode not found'})
+        raise HTTPException(status_code=400, detail='Salt barcode not found')
 
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request):
@@ -105,34 +118,33 @@ async def index(request: Request):
 
 @app.get('/create', response_class=HTMLResponse)
 async def create(request: Request):
-    return templates.TemplateResponse('create_new.html', {'request': request})
+    return templates.TemplateResponse('create_new.html', {'request': request, 'date': datetime.now().date()})
+
+@app.get('/edit', response_class=HTMLResponse)
+async def edit(request: Request):
+    return templates.TemplateResponse('edit.html', {'request': request})
 
 # Creates and uploads the parent metadata to dropbox
-@app.post('/create/parent')
-def create_parent(parent: Parent_vial):
-    data = [{'Date': datetime.now().date(),
-             "Barcode of Vial": parent.barcode,
+def save_parent(parent):
+    data = [{'Date': parent.date,
+             "Barcode of Vial": str(parent.barcode),
             'Executer': parent.executer,
             },]
 
     for attribute, fieldname in PROPERTIES_TO_FIELDMAMES['general'].items():
         data[0][fieldname] = parent.__getattribute__(attribute)
 
-    for salt_no in parent.salts:
-        if int(salt_no) > len(data):
+    for i, salt in enumerate(parent.salts):
+        if i > len(data) -1:
             data.append({})
-        salt = parent.salts[salt_no]
-        salt_index = int(salt_no)-1
-        row = data[salt_index]
+        row = data[i]
         for property, fieldname in PROPERTIES_TO_FIELDMAMES['salts'].items():
             row[fieldname] = salt[property]
 
-    for solvent_no in parent.solvents:
-        if int(solvent_no) > len(data):
+    for i, solvent in enumerate(parent.solvents):
+        if i > len(data) -1:
             data.append({})
-        solvent_index = int(solvent_no)-1
-        solvent = parent.solvents[solvent_no]
-        row = data[solvent_index]
+        row = data[i]
         for property, fieldname in PROPERTIES_TO_FIELDMAMES['solvents'].items():
             row[fieldname] = solvent[property]
 
@@ -144,43 +156,71 @@ def create_parent(parent: Parent_vial):
 
     try:
         upload_csv_buffer(csv_buffer, f'/parent_vials/{data[0]['Date']}_{parent.barcode}.csv')
-        return {'message': 'Uploaded successfully'}
-    except:
-        return {'message': 'Upload failed'}
+        return {'detail': 'Uploaded successfully'}
+    except Exception as e:
+        return {'detail': 'Upload failed', 'error': e}
 
-# Downloads the parent metadata from dropbox
-@app.get('/parent')
-def get_parent(parent_barcode: str):
+@app.post('/create/parent')
+async def create_parent(parent: Parent_vial):
+    try:
+        matches = search_parent_barcode(parent.barcode)
+    except Exception as e:
+        return {'detail': 'Upload failed', 'error': e}
+    if len(matches) == 1:
+        raise HTTPException(status_code=400, detail=f'There exists a vial with this barcode {parent.barcode}')
+    return save_parent(parent)
+
+@app.post('/edit/parent')
+async def edit_parent(parent: Parent_vial):
+    matches = search_parent_barcode(parent.barcode)
+    if len(matches) == 0:
+        raise HTTPException(status_code=404, detail=f'parent vial with barcode {parent.barcode} does not exist')
+    if len(matches) > 1:
+        raise HTTPException(status_code=400, detail=f'There are multiple vials with the barcode {parent.barcode}')
+    print(parent)
+    return save_parent(parent)
+
+
+
+def search_parent_barcode(parent_barcode):
     options = dropbox.files.SearchOptions(path='/parent_vials')
     result = dbx.files_search_v2(query=str(parent_barcode), options=options)
-    if len(result.matches) == 0:
+    return result.matches
+
+# Downloads the parent metadata from dropbox
+@app.get('/parent', response_class=HTMLResponse)
+async def get_parent(request: Request, parent_barcode: str):
+    matches = search_parent_barcode(parent_barcode)
+    if len(matches) == 0:
         raise HTTPException(status_code=404, detail=f'parent vial with barcode {parent_barcode} does not exist')
-    if len(result.matches) > 1:
+    if len(matches) > 1:
         raise HTTPException(status_code=400, detail=f'There are multiple vials with the barcode {parent_barcode}')
-    match = result.matches[0]
+    match = matches[0]
     path = match.metadata.get_metadata().path_display
     metadata, response = dbx.files_download(path)
     csv_data = response.content.decode('utf-8')
-    df = pd.read_csv(StringIO(csv_data))
+    df = pd.read_csv(StringIO(csv_data), dtype=str)
     output = {}
-    salts = {}
-    solvents = {}
+    salts = []
+    solvents = []
     for attribute, fieldname in PROPERTIES_TO_FIELDMAMES['general'].items():
         output[attribute] = df.iloc[0][fieldname]
     no_salts = df["Salt name"].count()
     for i in range(no_salts):
-        salts[i+1] = {}
+        salt = {}
         for attribute, fieldname in PROPERTIES_TO_FIELDMAMES['salts'].items():
-            salts[i+1][attribute] = df.iloc[i][fieldname]
+            salt[attribute] = df.iloc[i][fieldname]
+        salts.append(salt)
     no_solvents = df["Name of the solvent"].count()
     for i in range(no_solvents):
-        solvents[i+1] = {}
+        solvent = {}
         for attribute, fieldname in PROPERTIES_TO_FIELDMAMES['solvents'].items():
-            solvents[i+1][attribute] = df.iloc[i][fieldname]
+            solvent[attribute] =df.iloc[i][fieldname]
+        solvents.append(solvent)
 
     output['salts'] = salts
     output['solvents'] = solvents
-    return output
+    return templates.TemplateResponse('edit_vial.html', {'request': request} | output)
 
 @app.get('/salt/{salt_barcode}')
 def get_salt(salt_barcode: str):
