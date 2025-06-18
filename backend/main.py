@@ -110,7 +110,7 @@ def get_solvent(solvent_barcode: str):
         row_dict = row.iloc[0].fillna('').to_dict()
         return {'name': row_dict['Chemical Description'], 'concentration': row_dict['Concentration']}
     else:
-        raise HTTPException(status_code=400, detail='Salt barcode not found')
+        raise HTTPException(status_code=400, detail='Solvent barcode not found')
 
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request):
@@ -221,7 +221,3 @@ async def get_parent(request: Request, parent_barcode: str):
     output['salts'] = salts
     output['solvents'] = solvents
     return templates.TemplateResponse('edit_vial.html', {'request': request} | output)
-
-@app.get('/salt/{salt_barcode}')
-def get_salt(salt_barcode: str):
-    pass
