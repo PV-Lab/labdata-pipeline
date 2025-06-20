@@ -158,7 +158,7 @@ def save_parent(parent):
     csv_buffer.seek(0)
 
     try:
-        upload_csv_buffer(csv_buffer, f'/parent_vials/{data[0]['Date']}_{parent.barcode}.csv')
+        upload_csv_buffer(csv_buffer, f'/parent_vials/{data[0]["Date"]}_{parent.barcode}.csv')
         return {'detail': 'Uploaded successfully'}
     except Exception as e:
         return {'detail': 'Upload failed', 'error': e}
