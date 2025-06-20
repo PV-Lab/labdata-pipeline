@@ -5,6 +5,7 @@ import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import time
+import pandas as pd
 
 client = TestClient(app)
 
@@ -28,10 +29,16 @@ def test_get_solvent_1():
     }
 
 def test_save_parent_empty():
-    barcode = random.randint(0, 10000000)
-    parent = Parent_vial(date='2025-06-17', executer='Salvi',
+    barcode = 6865017
+    parent = Parent_vial(date='2025-06-18', executer='Salvi',
                          barcode=str(barcode), salts=[], solvents=[])
     assert main.save_parent(parent) == {'detail': 'Uploaded successfully'}
+    time.sleep(2)
+    df, path = main.download(str(barcode))
+    main.delete_file(path)
+    df_2 = pd.read_csv('backend/test_files/2025-06-18_6865017.csv', dtype=str)
+    pd.testing.assert_frame_equal(df, df_2)
+
 
 def test_create_empty():
     driver = webdriver.Chrome()
@@ -57,7 +64,28 @@ def test_create_salt():
     barcode_input.send_keys(str(barcode))
     add_salt_button = driver.find_element(By.ID, 'add_salt')
     add_salt_button.click()
-    add_test
+
+    time.sleep(0.1)
+    salts = driver.find_elements(By.CLASS_NAME, 'salt')
+    assert len(salts) == 1
+    salt = salts[0]
+    salt_barcode = salt.find_element(By.CLASS_NAME, 'salt_barcode')
+    salt_barcode.send_keys('01-314117')
+    time.sleep(0.1)
+    salt_name = salt.find_element(By.CLASS_NAME, 'salt_name')
+    salt_chem_form = salt.find_element(By.CLASS_NAME, 'salt_chem_form')
+    assert salt_name.get_attribute('value') == f"100% ETHANOL"
+    assert salt_chem_form.get_attribute('value') == 'C2H6O'
+    salt_molar_mass = salt.find_element(By.CLASS_NAME, 'salt_molar_mass')
+    salt_molar_mass.send_keys(46)
+    salt_mass = salt.find_element(By.CLASS_NAME, 'salt_mass')
+    salt_mass.send_keys(10)
+    salt_ambient_temp = salt.find_element(By.CLASS_NAME, 'salt_ambient_temp')
+    salt_ambient_temp.send_keys(101)
+    salt_ambient_humidity = salt.find_element(By.CLASS_NAME, 'salt_ambient_humidity')
+    salt_ambient_humidity.send_keys(43)
+
+    # save to dropbox
     save_button = driver.find_element(By.ID, 'save')
     save_button.click()
     time.sleep(2)

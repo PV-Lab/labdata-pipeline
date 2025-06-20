@@ -85,6 +85,9 @@ def upload_file(local_file_path, dropbox_file_path):
 def upload_csv_buffer(csv_buffer, dropbox_file_path):
     return dbx.files_upload(csv_buffer.getvalue().encode('utf-8'), dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
 
+def delete_file(file_path):
+    dbx.files_delete_v2(file_path)
+
 def change_to_native_types(object):
     if isinstance(object, np.int_):
         return int(object)
@@ -186,6 +189,24 @@ def search_parent_barcode(parent_barcode):
     options = dropbox.files.SearchOptions(path='/parent_vials')
     result = dbx.files_search_v2(query=str(parent_barcode), options=options)
     return result.matches
+
+def download(parent_barcode):
+    """
+    Downloads the file with the given barcode,
+    Returns the data frame and the file path
+    """
+    matches = search_parent_barcode(parent_barcode)
+    if len(matches) == 0:
+        raise HTTPException(status_code=404, detail=f'parent vial with barcode {parent_barcode} does not exist')
+    if len(matches) > 1:
+        raise HTTPException(status_code=400, detail=f'There are multiple vials with the barcode {parent_barcode}')
+    match = matches[0]
+    path = match.metadata.get_metadata().path_display
+    metadata, response = dbx.files_download(path)
+    csv_data = response.content.decode('utf-8')
+    df = pd.read_csv(StringIO(csv_data), dtype=str)
+    return df, path
+
 
 # Downloads the parent metadata from dropbox
 @app.get('/parent', response_class=HTMLResponse)
