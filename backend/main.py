@@ -18,6 +18,7 @@ load_dotenv()
 DROPBOX_APP_KEY = os.getenv('DROPBOX_APP_KEY')
 DROPBOX_APP_SECRET = os.getenv('DROPBOX_APP_SECRET')
 DROPBOX_REFRESH_TOKEN = os.getenv('DROPBOX_REFRESH_TOKEN')
+CHEMICAL_API_KEY = os.getenv('CHEMICAL_API_KEY')
 
 dbx = dropbox.Dropbox(app_key=DROPBOX_APP_KEY,
                       app_secret=DROPBOX_APP_SECRET,

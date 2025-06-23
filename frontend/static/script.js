@@ -8,11 +8,7 @@ function add_salt(event) {
     new_salt_div.innerHTML = `
     <form>
         <div>
-            Salt barcode: <button class="scan_salt_barcode">Scan</button>
-        </div>
-        <div>
-            Enter barcode manually: <input class="salt_barcode" type="text" oninput="search_salt_barcode(event)">
-            <button class="search_salt" onclick="search_salt_barcode(event)">Search</button>
+            Salt barcode: <input class="salt_barcode" type="text" onkeypress="search_salt_barcode(event)">
         </div>
         <div>
             Salt name: <input class="salt_name" type="text">
@@ -48,11 +44,7 @@ function add_solvent(event) {
     new_solvent_div.innerHTML = `
             <form>
                 <div>
-                    Solvent barcode: <button class="scan_solvent_barcode">Scan</button>
-                </div>
-                <div>
-                    Enter barcode manually: <input class="solvent_barcode" type="text" oninput="search_solvent(event)">
-                    <button class="search_solvent" onclick="search_solvent(event)">Search</button>
+                    Solvent barcode: <input class="solvent_barcode" type="text" onkeypress="search_solvent(event)">
                 </div>
                 <div>
                     Solvent name: <input class="solvent_name" type="text">
@@ -129,62 +121,104 @@ function create_parent_object() {
         };
 }
 
+function check_object(object) {
+    for (const key in object) {
+        if ((key !== 'salts') && (key !== 'solvents')) {
+            if (object[key] === '') {
+                return {
+                    'status': false,
+                    'empty': key
+                }
+            }
+        } else {
+            for (let i = 0; i < object[key].length; i++) {
+                const item = object[key][i];
+                for (const attribute in item) {
+                    if (item[attribute] === '') {
+                        return {
+                            'status': false,
+                            'empty': `${key.slice(0, -1)} #${i+1} ${attribute}`,
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return {
+        'status': true,
+    }
+}
+
 function save_to_dropbox() {
     parent_object = create_parent_object();
-    fetch('/create/parent', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(parent_object)
-    })
-    .then((response) => response.json())
-    .then((data) => {
-        console.log(data);
-        if (data.detail === 'Uploaded successfully') {
-            const message_div = document.querySelector('#message');
-            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
-        } else {
-            const message_div = document.querySelector('#message');
-            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
-        }
-    })
-    .catch((error) => {
-        console.log('Error', error)
-    })
+    check = check_object(parent_object);
+    if (check['status']) {
+        fetch('/create/parent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(parent_object)
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            console.log(data);
+            if (data.detail === 'Uploaded successfully') {
+                const message_div = document.querySelector('#message');
+                message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+            } else {
+                const message_div = document.querySelector('#message');
+                message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+            }
+        })
+        .catch((error) => {
+            console.log('Error', error)
+        })
+    } else {
+        const message_div = document.querySelector('#message');
+        message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+    }
+
 }
 
 function save_edit() {
     parent_object = create_parent_object();
-    fetch('/edit/parent', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(parent_object)
-    })
-    .then((response) => response.json())
-    .then((data) => {
-        console.log(data);
-        if (data.detail === 'Uploaded successfully') {
-            const message_div = document.querySelector('#message');
-            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
-        } else {
-            const message_div = document.querySelector('#message');
-            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
-        }
-    })
-    .catch((error) => {
-        console.log('Error', error)
-    })
+    check = check_object(parent_object);
+    if (check['status']) {
+        fetch('/edit/parent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(parent_object)
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            console.log(data);
+            if (data.detail === 'Uploaded successfully') {
+                const message_div = document.querySelector('#message');
+                message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+            } else {
+                const message_div = document.querySelector('#message');
+                message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+            }
+        })
+        .catch((error) => {
+            console.log('Error', error)
+        })
+    } else {
+        const message_div = document.querySelector('#message');
+        message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+    }
 }
 
 function search_salt_barcode(event) {
     event.preventDefault();
     target = event.target;
-    barcode = target.parentElement.querySelector('.salt_barcode').value;
+    barcode_input = target.parentElement.querySelector('.salt_barcode')
+    barcode = barcode_input.value;
     parent_div = target.parentElement.parentElement
-    if (barcode.length > 8) {
+    if (event.key === "Enter") {
         fetch(`/get_salt/${barcode}`)
         .then((response) => response.json())
         .then((data) => {
@@ -194,15 +228,18 @@ function search_salt_barcode(event) {
         .catch((error) => {
             console.log('Error', error)
         })
+    } else {
+        barcode_input.value = barcode + event.key;
     };
 }
 
 function search_solvent(event) {
     event.preventDefault();
     target = event.target;
-    barcode = target.parentElement.querySelector('.solvent_barcode').value;
+    barcode_input = target.parentElement.querySelector('.solvent_barcode')
+    barcode = barcode_input.value;
     parent_div = target.parentElement.parentElement
-    if (barcode.length > 8) {
+    if (event.key === "Enter") {
         fetch(`/get_solvent/${barcode}`)
         .then((response) => response.json())
         .then((data) => {
@@ -212,5 +249,7 @@ function search_solvent(event) {
         .catch((error) => {
             console.log('Error', error)
         })
+    } else {
+        barcode_input.value = barcode + event.key;
     }
 }

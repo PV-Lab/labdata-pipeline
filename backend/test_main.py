@@ -4,6 +4,7 @@ from backend.main import app, Parent_vial
 import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 import time
 import pandas as pd
 
@@ -71,6 +72,7 @@ def test_create_salt():
     salt = salts[0]
     salt_barcode = salt.find_element(By.CLASS_NAME, 'salt_barcode')
     salt_barcode.send_keys('01-314117')
+    salt_barcode.send_keys(Keys.ENTER)
     time.sleep(0.1)
     salt_name = salt.find_element(By.CLASS_NAME, 'salt_name')
     salt_chem_form = salt.find_element(By.CLASS_NAME, 'salt_chem_form')
