@@ -14,7 +14,7 @@ def test_get_salt_1():
     response = client.get('/get_salt/01-334088')
     assert response.status_code == 200
     assert response.json() == {'name': '2-Cyanoethyltriethoxysilane',
-                               'chem_form': 'C9H19NO3Si'}
+                               'chem_form': 'C9H19NO3Si', 'molar_mass': '217.34'}
 
 def test_get_salt_2():
     response = client.get('/get_salt/24343212')

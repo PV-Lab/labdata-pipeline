@@ -224,6 +224,7 @@ function search_salt_barcode(event) {
         .then((data) => {
             parent_div.querySelector('.salt_name').value = data['name'];
             parent_div.querySelector('.salt_chem_form').value = data['chem_form'];
+            parent_div.querySelector('.salt_molar_mass').value = data['molar_mass'];
         })
         .catch((error) => {
             console.log('Error', error)

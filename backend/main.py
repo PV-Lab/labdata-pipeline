@@ -12,13 +12,14 @@ from datetime import datetime
 import pandas as pd
 from io import StringIO
 import numpy as np
+import requests
 
 load_dotenv()
 
 DROPBOX_APP_KEY = os.getenv('DROPBOX_APP_KEY')
 DROPBOX_APP_SECRET = os.getenv('DROPBOX_APP_SECRET')
 DROPBOX_REFRESH_TOKEN = os.getenv('DROPBOX_REFRESH_TOKEN')
-CHEMICAL_API_KEY = os.getenv('CHEMICAL_API_KEY')
+CHEMICALS_API_KEY = os.getenv('CHEMICALS_API_KEY')
 
 dbx = dropbox.Dropbox(app_key=DROPBOX_APP_KEY,
                       app_secret=DROPBOX_APP_SECRET,
@@ -98,22 +99,36 @@ def change_to_native_types(object):
 
 @app.get('/get_salt/{salt_barcode}')
 def get_salt(salt_barcode: str):
-    row = INVENTORY[INVENTORY['Inventory Bar Code'] == salt_barcode]
-    if not row.empty:
-        row_dict = row.iloc[0].fillna('').to_dict()
-        return {'name': row_dict['Chemical Description'], 'chem_form': row_dict['Chemical Formula']}
-    else:
+    params = {'AuthKey': CHEMICALS_API_KEY,
+              'barcode': salt_barcode}
+    response = requests.get('https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData',
+                          params=params)
+    try:
+        result = response.json()
+        cas = result['Table'][0]['cas_num']
+        name = result['Table'][0]['chemical_description']
+        chem_form = result['Table'][0]['chemical_formula']
+        molar_mass = ''
+        if cas:
+            cid = requests.get(f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON').json()["IdentifierList"]["CID"][0]
+            molar_mass = requests.get(f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight/JSON').json()["PropertyTable"]["Properties"][0]["MolecularWeight"]
+        return {'name': name, 'chem_form': chem_form, 'molar_mass': molar_mass}
+
+    except Exception as e:
         raise HTTPException(status_code=400, detail='Salt barcode not found')
 
 
 
 @app.get('/get_solvent/{solvent_barcode}')
 def get_solvent(solvent_barcode: str):
-    row = INVENTORY[INVENTORY['Inventory Bar Code'] == solvent_barcode]
-    if not row.empty:
-        row_dict = row.iloc[0].fillna('').to_dict()
-        return {'name': row_dict['Chemical Description'], 'concentration': row_dict['Concentration']}
-    else:
+    params = {'AuthKey': CHEMICALS_API_KEY,
+              'barcode': solvent_barcode}
+    response = requests.get('https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData',
+                          params=params)
+    try:
+        result = response.json()
+        return {'name': result['Table'][0]['chemical_description'], 'concentration': result['Table'][0]['concentration']}
+    except:
         raise HTTPException(status_code=400, detail='Solvent barcode not found')
 
 @app.get('/', response_class=HTMLResponse)
