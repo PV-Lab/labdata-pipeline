@@ -21,9 +21,17 @@ DROPBOX_APP_SECRET = os.getenv('DROPBOX_APP_SECRET')
 DROPBOX_REFRESH_TOKEN = os.getenv('DROPBOX_REFRESH_TOKEN')
 CHEMICALS_API_KEY = os.getenv('CHEMICALS_API_KEY')
 
+PARENT_PATH = '/Buonassisi-Group/Projects - Active/Labdata-pipeline/Tests'
+
 dbx = dropbox.Dropbox(app_key=DROPBOX_APP_KEY,
                       app_secret=DROPBOX_APP_SECRET,
                       oauth2_refresh_token=DROPBOX_REFRESH_TOKEN)
+
+# dbx = dropbox.Dropbox('sl.u.AF3e4ArKRb0b4Dpr25F6gDh70zQ9X3_wDPhb4RDzgbcJkxF8xOlIzPoBUKqiBqUN_M_xg7-765e8UFNA1N_kbI5N8VXmZWfb-xCYwjtD5Ee7Hzh6CtUSgr7EUdA6xBC7QKTNzjlBvNJyH8kf_pioCwHYWf2NZvLtJ21kirh8XjY5bg5QPMkIHoFHgn-Y278jhnLgUrW1bSumYkNygmK2y9Nwuc5oYcNqF6K--AiiNSjJH0PaerI6y1-keNIrW_L3YvrOJZ5LYNBtUOvgRGNTeHLzLlXjvAAErC6_7qCbdPWLpS7yXRS8B8tMrZcr80eVVRhSQA6yIst3On3_f5thwFEPdmYZh-xD1XcdvaIYCmB5XzZlfsCZtRk2Tzl7uQc3WeXf5yTSccMFaPvEKIhemiBksqbJeNx9v0FuxWPZkRbEjRC9Rw4AuRAVQ0vgdVsA504dfft_n-gQBurmhda6v0pmtdgU6gHr61cF2TUn2wXp8S98S11zvqOrCJge-OdIxIpHoa_7gDHhkmUoZ1Zr9tN7_Q3vbHSFcSQM4F4tF9FyoRfAbaQlq4Zrt7CKX5cVs7TW3Utgx-gKRapY4HHQIs8FCj6ZtPiGorCvYBrNkmV89igNrN_V2_k5JvB7DoUGwY3CmoX5mGKQKZB7F7-BPSHxITvlheMgKXfBfUiDEnoh7MjJ7lqMInVhyHEpP_7hyS7xV8XWOHyxWFgUUQPVYtPafCHufjzFptQAzskYAQjl2MiXWAlpp6FbVEPouNwOLZtyl_lWfRe4annbNF7EfwW7osvb3fRYOR4XyVay_z_7c2OKl72zyEq3xRHT0FJZ-R9qEsc7sn_T66PozW_mFho_FJe7_KbAO6a5hKbZYzGV5z6dLPE9pAp9dpnPbAEanHITDlhrhoVrEZMMqsV37NfZDOdoeaCT7rkU8hrYVdjYg2x9si3dke6tYEnoJhDdU1E9MqMoO_Izn25p8kNA0QWeTPKvUqwDnPUoIgB5N1ITZEO2Ot2N-Z6bAeX3f9nObM4qh-nbX68GsIgj7NRjvHGmWJSxExklRj-Ftl0UGxiJ2OajkKgv6VoeXwnGYfxiWfUM96Yg_AZVzAR-QrrfAW99Cm1_UPchtOjt7mpqcqnLH48LEX4n393MG2umRHWS3dBKoAd0kFfl8phtywxYvxWECnyPP0BgvirjFv8YUfYO6837wpKOlEY78DbsVyGsnWYWxpNbxcAQTGtdUKjN_xZgoNzdEqhxw1bUyKhHnDr14Z22DLiPwuafb9aIuA1UxZlJNbgkONrFkalA1M1og9lw')
+
+account = dbx.users_get_current_account()
+team_namespace_id = account.root_info.root_namespace_id
+dbx = dbx.with_path_root(dropbox.common.PathRoot.namespace_id(team_namespace_id))
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
@@ -35,21 +43,24 @@ try:
 except:
     raise HTTPException(status_code=400, detail={'detail': 'Inventory not found'})
 
-FIELDNAMES = ["Date", "Executer", "Salt name",
+FIELDNAMES = ["Date", "Executer", "Barcode on the salt", "Salt name",
                   "Chemical formula", "Salt Molecular Weight in g/mol", "Mass of salt added in the vial in g",
                   "Ambient temperature in glovebox (C)", "Ambient humidity in glovebox (%)",
-                  "Barcode on the salt", "Name of the solvent", "Concentration of the solvent (%)",
-                 "Barcode on the solvent", "Vol of solvent added (ml)", "Desired molarity",
-                  "Ambient temperature (C)", "Ambient humidity (%)", "Stir Time (min)", "Barcode of Vial"]
+                  "Salt receipt date",  "Barcode on the solvent", "Name of the solvent", "Concentration of the solvent (%)",
+                  "Vol of solvent added (ml)", "Desired molarity",
+                  "Ambient temperature (C)", "Ambient humidity (%)", "Stir Time (min)", "Solvent receipt date",
+                  "Barcode of Vial",
+                  ]
 
 PROPERTIES_TO_FIELDMAMES = {'general': {'executer': "Executer", 'barcode': "Barcode of Vial", 'date': "Date"},
                             'salts': {'name': "Salt name", 'barcode': "Barcode on the salt", "chemical_formula": "Chemical formula",
                                     "molar_mass": "Salt Molecular Weight in g/mol", "mass": "Mass of salt added in the vial in g",
-                                    'ambient_temp': "Ambient temperature in glovebox (C)", 'ambient_humidity': "Ambient humidity in glovebox (%)"},
+                                    'ambient_temp': "Ambient temperature in glovebox (C)", 'ambient_humidity': "Ambient humidity in glovebox (%)",
+                                    'receipt_date': 'Salt receipt date'},
                             'solvents': {'barcode': "Barcode on the solvent", 'name': "Name of the solvent", 'concentration': "Concentration of the solvent (%)",
                                          'vol_added': "Vol of solvent added (ml)", 'desired_molarity': "Desired molarity",
                                          'ambient_temp': "Ambient temperature (C)", 'ambient_humidity': "Ambient humidity (%)",
-                                         'stir_time': "Stir Time (min)"}
+                                         'stir_time': "Stir Time (min)", 'receipt_date': 'Solvent receipt date'}
                             }
 
 class Parent_vial(BaseModel):
@@ -82,10 +93,10 @@ class Solvent(BaseModel):
 #### helper functions ###
 def upload_file(local_file_path, dropbox_file_path):
     with open(local_file_path, 'rb') as f:
-        dbx.files_upload(f.read(), dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
+        dbx.files_upload(f.read(), PARENT_PATH + dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
 
 def upload_csv_buffer(csv_buffer, dropbox_file_path):
-    return dbx.files_upload(csv_buffer.getvalue().encode('utf-8'), dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
+    return dbx.files_upload(csv_buffer.getvalue().encode('utf-8'), PARENT_PATH + dropbox_file_path, mode=dropbox.files.WriteMode('overwrite'))
 
 def delete_file(file_path):
     dbx.files_delete_v2(file_path)
@@ -111,8 +122,11 @@ def get_salt(salt_barcode: str):
         molar_mass = ''
         if cas:
             cid = requests.get(f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON').json()["IdentifierList"]["CID"][0]
-            molar_mass = requests.get(f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight/JSON').json()["PropertyTable"]["Properties"][0]["MolecularWeight"]
-        return {'name': name, 'chem_form': chem_form, 'molar_mass': molar_mass}
+            response = requests.get(f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight,MolecularFormula/JSON').json()
+            molar_mass = response["PropertyTable"]["Properties"][0]["MolecularWeight"]
+            if not chem_form:
+                chem_form = response["PropertyTable"]["Properties"][0]["MolecularFormula"]
+        return {'name': name, 'chem_form': chem_form, 'molar_mass': molar_mass, 'receipt_date': result['Table'][0]['receipt_date'][:10]}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail='Salt barcode not found')
@@ -127,7 +141,8 @@ def get_solvent(solvent_barcode: str):
                           params=params)
     try:
         result = response.json()
-        return {'name': result['Table'][0]['chemical_description'], 'concentration': result['Table'][0]['concentration']}
+        return {'name': result['Table'][0]['chemical_description'], 'concentration': result['Table'][0]['concentration'],
+                'receipt_date': result['Table'][0]['receipt_date'][:10]}
     except:
         raise HTTPException(status_code=400, detail='Solvent barcode not found')
 
@@ -202,7 +217,7 @@ async def edit_parent(parent: Parent_vial):
 
 
 def search_parent_barcode(parent_barcode):
-    options = dropbox.files.SearchOptions(path='/parent_vials')
+    options = dropbox.files.SearchOptions(path=PARENT_PATH + '/parent_vials')
     result = dbx.files_search_v2(query=str(parent_barcode), options=options)
     return result.matches
 
@@ -227,16 +242,7 @@ def download(parent_barcode):
 # Downloads the parent metadata from dropbox
 @app.get('/parent', response_class=HTMLResponse)
 async def get_parent(request: Request, parent_barcode: str):
-    matches = search_parent_barcode(parent_barcode)
-    if len(matches) == 0:
-        raise HTTPException(status_code=404, detail=f'parent vial with barcode {parent_barcode} does not exist')
-    if len(matches) > 1:
-        raise HTTPException(status_code=400, detail=f'There are multiple vials with the barcode {parent_barcode}')
-    match = matches[0]
-    path = match.metadata.get_metadata().path_display
-    metadata, response = dbx.files_download(path)
-    csv_data = response.content.decode('utf-8')
-    df = pd.read_csv(StringIO(csv_data), dtype=str)
+    df, path = download(parent_barcode)
     output = {}
     salts = []
     solvents = []

@@ -12,7 +12,7 @@ import dropbox
 
 def generate_refresh_token():
     REDIRECT_URI = "http://localhost:8080"
-    SCOPES = "account_info.read files.content.write files.content.read"
+    SCOPES = "account_info.read files.metadata.write files.metadata.read files.content.write files.content.read sharing.read"
 
     # Step 1: Direct user to auth URL
     params = {
@@ -47,10 +47,12 @@ def generate_refresh_token():
         "grant_type": "authorization_code",
         "client_id": APP_KEY,
         "client_secret": APP_SECRET,
-        "redirect_uri": REDIRECT_URI
+        "redirect_uri": REDIRECT_URI,
+        "token_access_type": "offline",
     })
     response.raise_for_status()
     tokens = response.json()
+    print(tokens['scope'])
     return tokens["refresh_token"]
 
 

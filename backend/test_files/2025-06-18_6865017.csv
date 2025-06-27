@@ -1,2 +1,2 @@
-Date,Executer,Salt name,Chemical formula,Salt Molecular Weight in g/mol,Mass of salt added in the vial in g,Ambient temperature in glovebox (C),Ambient humidity in glovebox (%),Barcode on the salt,Name of the solvent,Concentration of the solvent (%),Barcode on the solvent,Vol of solvent added (ml),Desired molarity,Ambient temperature (C),Ambient humidity (%),Stir Time (min),Barcode of Vial
-2025-06-18,Salvi,,,,,,,,,,,,,,,,6865017
+Date,Executer,Barcode on the salt,Salt name,Chemical formula,Salt Molecular Weight in g/mol,Mass of salt added in the vial in g,Ambient temperature in glovebox (C),Ambient humidity in glovebox (%),Salt receipt date,Barcode on the solvent,Name of the solvent,Concentration of the solvent (%),Vol of solvent added (ml),Desired molarity,Ambient temperature (C),Ambient humidity (%),Stir Time (min),Solvent receipt date,Barcode of Vial
+2025-06-18,Salvi,,,,,,,,,,,,,,,,,,6865017

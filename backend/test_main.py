@@ -14,7 +14,7 @@ def test_get_salt_1():
     response = client.get('/get_salt/01-334088')
     assert response.status_code == 200
     assert response.json() == {'name': '2-Cyanoethyltriethoxysilane',
-                               'chem_form': 'C9H19NO3Si', 'molar_mass': '217.34'}
+                               'chem_form': 'C9H19NO3Si', 'molar_mass': '217.34', 'receipt_date': '2023-11-08'}
 
 def test_get_salt_2():
     response = client.get('/get_salt/24343212')
@@ -27,6 +27,7 @@ def test_get_solvent_1():
     assert response.json() == {
         'name': '2-Propanol',
         'concentration': 99.9,
+        'receipt_date': '2023-11-07'
     }
 
 def test_save_parent_empty():
@@ -73,7 +74,7 @@ def test_create_salt():
     salt_barcode = salt.find_element(By.CLASS_NAME, 'salt_barcode')
     salt_barcode.send_keys('01-314117')
     salt_barcode.send_keys(Keys.ENTER)
-    time.sleep(0.1)
+    time.sleep(1)
     salt_name = salt.find_element(By.CLASS_NAME, 'salt_name')
     salt_chem_form = salt.find_element(By.CLASS_NAME, 'salt_chem_form')
     assert salt_name.get_attribute('value') == f"100% ETHANOL"
