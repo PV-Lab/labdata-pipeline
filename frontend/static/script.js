@@ -28,6 +28,9 @@ function add_salt(event) {
         <div>
             Ambient humidity in GB (%): <input class="salt_ambient_humidity" type="number">
         </div>
+        <div>
+            Salt receipt date: <input class="salt_receipt_date" type="text">
+        </div>
     </form>
     <hr>
     `;
@@ -67,6 +70,9 @@ function add_solvent(event) {
                 <div>
                     Stir time (min): <input class="solvent_stir_time" type="number">
                 </div>
+                <div>
+                    Solvent receipt date: <input class="solvent_receipt_date" type="text">
+                </div>
             </form>
             <hr>
         `;
@@ -94,6 +100,7 @@ function create_parent_object() {
             mass: div.querySelector('.salt_mass').value,
             ambient_temp: div.querySelector('.salt_ambient_temp').value,
             ambient_humidity: div.querySelector('.salt_ambient_humidity').value,
+            receipt_date: div.querySelector('.salt_receipt_date').value,
         });
     });
     solvents_div.querySelectorAll('.solvent').forEach(function(div) {
@@ -109,7 +116,8 @@ function create_parent_object() {
             desired_molarity: div.querySelector('.solvent_molarity').value,
             ambient_temp: div.querySelector('.solvent_temp').value,
             ambient_humidity: div.querySelector('.solvent_humidity').value,
-            stir_time: div.querySelector('.solvent_stir_time').value
+            stir_time: div.querySelector('.solvent_stir_time').value,
+            receipt_date: div.querySelector('.solvent_receipt_date').value,
         });
     });
     return {
@@ -225,6 +233,7 @@ function search_salt_barcode(event) {
             parent_div.querySelector('.salt_name').value = data['name'];
             parent_div.querySelector('.salt_chem_form').value = data['chem_form'];
             parent_div.querySelector('.salt_molar_mass').value = data['molar_mass'];
+            parent_div.querySelector('.salt_receipt_date').value = data['receipt_date'];
         })
         .catch((error) => {
             console.log('Error', error)
@@ -246,6 +255,7 @@ function search_solvent(event) {
         .then((data) => {
             parent_div.querySelector('.solvent_name').value = data['name'];
             parent_div.querySelector('.solvent_concentration').value = data['concentration'];
+            parent_div.querySelector('.solvent_receipt_date').value = data['receipt_date'];
         })
         .catch((error) => {
             console.log('Error', error)

@@ -37,6 +37,9 @@
             Ambient humidity in GB (%): <input
             class="salt_ambient_humidity" type="number" value="{{ salt['ambient_humidity'] }}" disabled>
         </div>
+        <div>
+            Salt receipt date: <input class="salt_receipt_date" type="text" value="{{ salt['receipt_date'] }}" disabled>
+        </div>
     </form>
     <hr>
     </div>
@@ -74,6 +77,9 @@
                 </div>
                 <div>
                     Stir time (min): <input class="solvent_stir_time" type="number" value="{{ solvent['stir_time'] }}" disabled>
+                </div>
+                <div>
+                    Solvent receipt date: <input class="solvent_receipt_date" type="text" value="{{solvent['receipt_date']}}" disabled>
                 </div>
             </form>
             <hr>
