@@ -8,7 +8,7 @@ function add_salt(event) {
     new_salt_div.innerHTML = `
     <form>
         <div>
-            Salt barcode: <input class="salt_barcode" type="text" onkeypress="search_salt_barcode(event)">
+            Salt barcode: <input class="salt_barcode" type="text" onkeypress="search_salt_barcode(event)"> <span class="spinner"></span>
         </div>
         <div>
             Salt name: <input class="salt_name" type="text">
@@ -47,7 +47,7 @@ function add_solvent(event) {
     new_solvent_div.innerHTML = `
             <form>
                 <div>
-                    Solvent barcode: <input class="solvent_barcode" type="text" onkeypress="search_solvent(event)">
+                    Solvent barcode: <input class="solvent_barcode" type="text" onkeypress="search_solvent(event)"> <span class="spinner"></span>
                 </div>
                 <div>
                     Solvent name: <input class="solvent_name" type="text">
@@ -160,7 +160,10 @@ function check_object(object) {
 function save_to_dropbox() {
     parent_object = create_parent_object();
     check = check_object(parent_object);
+    const message_div = document.querySelector('#message');
+    const spinner = message_div.parentElement.querySelector('.spinner');
     if (check['status']) {
+        spinner.style.display = 'inline-block';
         fetch('/create/parent', {
             method: 'POST',
             headers: {
@@ -172,18 +175,16 @@ function save_to_dropbox() {
         .then((data) => {
             console.log(data);
             if (data.detail === 'Uploaded successfully') {
-                const message_div = document.querySelector('#message');
                 message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
             } else {
-                const message_div = document.querySelector('#message');
                 message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
             }
+            spinner.style.display = 'none';
         })
         .catch((error) => {
             console.log('Error', error)
         })
     } else {
-        const message_div = document.querySelector('#message');
         message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
     }
 
@@ -192,7 +193,10 @@ function save_to_dropbox() {
 function save_edit() {
     parent_object = create_parent_object();
     check = check_object(parent_object);
+    const message_div = document.querySelector('#message');
+    const spinner = message_div.parentElement.querySelector('.spinner');
     if (check['status']) {
+        spinner.style.display = 'inline-block';
         fetch('/edit/parent', {
             method: 'POST',
             headers: {
@@ -204,18 +208,16 @@ function save_edit() {
         .then((data) => {
             console.log(data);
             if (data.detail === 'Uploaded successfully') {
-                const message_div = document.querySelector('#message');
                 message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
             } else {
-                const message_div = document.querySelector('#message');
                 message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
             }
+            spinner.style.display = 'none';
         })
         .catch((error) => {
             console.log('Error', error)
         })
     } else {
-        const message_div = document.querySelector('#message');
         message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
     }
 }
@@ -226,7 +228,9 @@ function search_salt_barcode(event) {
     barcode_input = target.parentElement.querySelector('.salt_barcode')
     barcode = barcode_input.value;
     parent_div = target.parentElement.parentElement
+    const spinner = target.parentElement.querySelector('.spinner')
     if (event.key === "Enter") {
+        spinner.style.display = 'inline-block';
         fetch(`/get_salt/${barcode}`)
         .then((response) => response.json())
         .then((data) => {
@@ -234,6 +238,7 @@ function search_salt_barcode(event) {
             parent_div.querySelector('.salt_chem_form').value = data['chem_form'];
             parent_div.querySelector('.salt_molar_mass').value = data['molar_mass'];
             parent_div.querySelector('.salt_receipt_date').value = data['receipt_date'];
+            spinner.style.display = 'none';
         })
         .catch((error) => {
             console.log('Error', error)
@@ -249,13 +254,16 @@ function search_solvent(event) {
     barcode_input = target.parentElement.querySelector('.solvent_barcode')
     barcode = barcode_input.value;
     parent_div = target.parentElement.parentElement
+    const spinner = target.parentElement.querySelector('.spinner')
     if (event.key === "Enter") {
+        spinner.style.display = 'inline-block';
         fetch(`/get_solvent/${barcode}`)
         .then((response) => response.json())
         .then((data) => {
             parent_div.querySelector('.solvent_name').value = data['name'];
             parent_div.querySelector('.solvent_concentration').value = data['concentration'];
             parent_div.querySelector('.solvent_receipt_date').value = data['receipt_date'];
+            spinner.style.display = 'none';
         })
         .catch((error) => {
             console.log('Error', error)
@@ -263,4 +271,37 @@ function search_solvent(event) {
     } else {
         barcode_input.value = barcode + event.key;
     }
+}
+
+
+function save_child() {
+    let child = {};
+    child.date = document.querySelector('.date').innerHTML;
+    console.log(child);
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+        child[input.className] = input.value;
+    });
+    console.log(child);
+    fetch('/create/child', {
+        'method': 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(child)
+    })
+    .then((response) => response.json())
+    .then((data) => {
+        console.log(data);
+        if (data.detail === 'Uploaded successfully') {
+            const message_div = document.querySelector('#message');
+            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+        } else {
+            const message_div = document.querySelector('#message');
+            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+        }
+    })
+    .catch((error) => {
+        console.log('Error', error)
+    })
 }

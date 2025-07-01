@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+<div>
+    Executer: <input class="executer" type="text" value="{{ executer }}" disabled>
+</div>
+<div>
+    Enter the child vials holder barcode: <input class="barcode" type="text" value="{{ barcode }}" disabled>
+</div>
+<div>
+    Date: <strong><span class="date">{{ date }}</span></strong>
+</div>
+<div>
+    <h4>Parent vials:</h4>
+    <div>
+        Parent vial 1 barcode: <a href="/parent?parent_barcode={{ parent_1 }}">{{ parent_1}}</a>
+    </div>
+    <div>
+        Parent vial 2 barcode: <a href="/parent?parent_barcode={{ parent_2 }}">{{ parent_2}}</a>
+    </div>
+</div>
+<hr>
+<div>
+    Ambient temperature (C): <input class="ambient_temp" type="number" value="{{ ambient_temp }}">
+</div>
+<div>
+    Ambient humidity (%): <input class="ambient_humidity" type="number" value="{{ ambient_humidity }}">
+</div>
+<div id="message"></div>
+{% endblock %}

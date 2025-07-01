@@ -63,6 +63,11 @@ PROPERTIES_TO_FIELDMAMES = {'general': {'executer': "Executer", 'barcode': "Barc
                                          'stir_time': "Stir Time (min)", 'receipt_date': 'Solvent receipt date'}
                             }
 
+CHILD_FIELDNAMES = ["Date", "Executer", "Barcode on holder", "Parent 1 barcode", "Parent 2 barcode", "Ambient temperature (C)", "Ambient humidity (%)"]
+
+CHILD_PROPERTIES_TO_FIELDNAMES = {'date': "Date", 'executer': "Executer", 'barcode': "Barcode on holder", 'parent_1': "Parent 1 barcode",
+                                  'parent_2': "Parent 2 barcode", 'ambient_temp': "Ambient temperature (C)", 'ambient_humidity': "Ambient humidity (%)"}
+
 class Parent_vial(BaseModel):
     date: str
     executer: str
@@ -88,6 +93,15 @@ class Solvent(BaseModel):
     ambient_humidity: float
     stir_time: float
 
+class Child(BaseModel):
+    barcode: str
+    executer: str
+    date: str
+    parent_1: str
+    parent_2: str
+    ambient_temp: float
+    ambient_humidity: float
+
 
 
 #### helper functions ###
@@ -108,8 +122,12 @@ def change_to_native_types(object):
         return float(object)
     return object
 
+### API endpoints ###
 @app.get('/get_salt/{salt_barcode}')
 def get_salt(salt_barcode: str):
+    """
+    Returns information about a salt
+    """
     params = {'AuthKey': CHEMICALS_API_KEY,
               'barcode': salt_barcode}
     response = requests.get('https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData',
@@ -146,6 +164,7 @@ def get_solvent(solvent_barcode: str):
     except:
         raise HTTPException(status_code=400, detail='Solvent barcode not found')
 
+## Webpages
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse('index.html', {'request': request})
@@ -158,6 +177,10 @@ async def create(request: Request):
 async def edit(request: Request):
     return templates.TemplateResponse('edit.html', {'request': request})
 
+@app.get('/create-child', response_class=HTMLResponse)
+async def create_child(request: Request):
+    return templates.TemplateResponse('create_child.html', {'request': request, 'date': datetime.now().date()})
+
 # Creates and uploads the parent metadata to dropbox
 def save_parent(parent):
     data = [{'Date': parent.date,
@@ -165,9 +188,11 @@ def save_parent(parent):
             'Executer': parent.executer,
             },]
 
+    # for each general attribute, add the data to the fieldname
     for attribute, fieldname in PROPERTIES_TO_FIELDMAMES['general'].items():
         data[0][fieldname] = parent.__getattribute__(attribute)
 
+    # for each salt attribute, add the data to the fieldname
     for i, salt in enumerate(parent.salts):
         if i > len(data) -1:
             data.append({})
@@ -175,6 +200,7 @@ def save_parent(parent):
         for property, fieldname in PROPERTIES_TO_FIELDMAMES['salts'].items():
             row[fieldname] = salt[property]
 
+    # for each solvent attribute, add the data to the fieldname
     for i, solvent in enumerate(parent.solvents):
         if i > len(data) -1:
             data.append({})
@@ -216,19 +242,19 @@ async def edit_parent(parent: Parent_vial):
 
 
 
-def search_parent_barcode(parent_barcode):
-    options = dropbox.files.SearchOptions(path=PARENT_PATH + '/parent_vials')
+def search_parent_barcode(parent_barcode, parent_folder='/parent_vials'):
+    options = dropbox.files.SearchOptions(path=PARENT_PATH + parent_folder)
     result = dbx.files_search_v2(query=str(parent_barcode), options=options)
     return result.matches
 
-def download(parent_barcode):
+def download(parent_barcode, parent_folder='/parent_vials'):
     """
     Downloads the file with the given barcode,
     Returns the data frame and the file path
     """
-    matches = search_parent_barcode(parent_barcode)
+    matches = search_parent_barcode(parent_barcode, parent_folder)
     if len(matches) == 0:
-        raise HTTPException(status_code=404, detail=f'parent vial with barcode {parent_barcode} does not exist')
+        raise HTTPException(status_code=404, detail=f'Vial with barcode {parent_barcode} does not exist')
     if len(matches) > 1:
         raise HTTPException(status_code=400, detail=f'There are multiple vials with the barcode {parent_barcode}')
     match = matches[0]
@@ -264,3 +290,33 @@ async def get_parent(request: Request, parent_barcode: str):
     output['salts'] = salts
     output['solvents'] = solvents
     return templates.TemplateResponse('edit_vial.html', {'request': request} | output)
+
+@app.post('/create/child')
+def save_child(child: Child):
+    data = [{}]
+    for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
+        data[0][fieldname] = child.__getattribute__(attribute)
+
+    csv_buffer = StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=CHILD_FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(data)
+    csv_buffer.seek(0)
+
+    try:
+        upload_csv_buffer(csv_buffer, f'/child_vials/{data[0]["Date"]}_{child.barcode}.csv')
+        return {'detail': 'Uploaded successfully'}
+    except Exception as e:
+        return {'detail': 'Upload failed', 'error': e}
+
+@app.get('/view/child', response_class=HTMLResponse)
+async def get_parent(request: Request, barcode: str):
+    df, path = download(barcode, '/child_vials')
+    output = {}
+    for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
+        output[attribute] = df.iloc[0][fieldname]
+    return templates.TemplateResponse('view_child.html', {'request': request} | output)
+
+@app.get('/search/child', response_class=HTMLResponse)
+async def search_child(request: Request):
+    return templates.TemplateResponse('search_child.html', {'request': request})
