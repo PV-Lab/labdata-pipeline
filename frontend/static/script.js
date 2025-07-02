@@ -19,6 +19,9 @@ function add_salt(event) {
         <div>
             Molar mass (g/mol): <input class="salt_molar_mass" type="number">
         </div>
+         <div>
+            Desired molarity: <input class="salt_desired_molarity" type="text" inputmode="decimal" onkeypress="calculate_mass(event)">
+        </div>
         <div>
             Mass (g): <input class="salt_mass" type="number">
         </div>
@@ -56,9 +59,6 @@ function add_solvent(event) {
                     Concentration: <input class="solvent_concentration" type="text">
                 </div>
                 <div>
-                    Desired molarity: <input class="solvent_molarity" type="number">
-                </div>
-                <div>
                     Volume added (ml): <input class="solvent_vol" type="number">
                 </div>
                 <div>
@@ -85,6 +85,7 @@ function create_parent_object() {
     const executer = document.querySelector('#executer').value;
     const barcode = document.querySelector('#parent_barcode').value;
     const date = document.querySelector('#date').innerHTML;
+    const total_volume = document.querySelector('#volume').value;
     let salts = [];
     let solvents = [];
     salts_div.querySelectorAll('.salt').forEach(function(div) {
@@ -97,6 +98,7 @@ function create_parent_object() {
             name: div.querySelector('.salt_name').value,
             chemical_formula: div.querySelector('.salt_chem_form').value,
             molar_mass: div.querySelector('.salt_molar_mass').value,
+            desired_molarity: div.querySelector('.salt_desired_molarity').value,
             mass: div.querySelector('.salt_mass').value,
             ambient_temp: div.querySelector('.salt_ambient_temp').value,
             ambient_humidity: div.querySelector('.salt_ambient_humidity').value,
@@ -113,7 +115,6 @@ function create_parent_object() {
             name: div.querySelector('.solvent_name').value,
             concentration: div.querySelector('.solvent_concentration').value,
             vol_added: div.querySelector('.solvent_vol').value,
-            desired_molarity: div.querySelector('.solvent_molarity').value,
             ambient_temp: div.querySelector('.solvent_temp').value,
             ambient_humidity: div.querySelector('.solvent_humidity').value,
             stir_time: div.querySelector('.solvent_stir_time').value,
@@ -124,6 +125,7 @@ function create_parent_object() {
             date: date,
             executer: executer,
             barcode: barcode,
+            total_volume: total_volume,
             salts: salts,
             solvents: solvents,
         };
@@ -239,6 +241,7 @@ function search_salt_barcode(event) {
             parent_div.querySelector('.salt_molar_mass').value = data['molar_mass'];
             parent_div.querySelector('.salt_receipt_date').value = data['receipt_date'];
             spinner.style.display = 'none';
+            parent_div.querySelector('.salt_desired_molarity').focus();
         })
         .catch((error) => {
             console.log('Error', error)
@@ -264,6 +267,7 @@ function search_solvent(event) {
             parent_div.querySelector('.solvent_concentration').value = data['concentration'];
             parent_div.querySelector('.solvent_receipt_date').value = data['receipt_date'];
             spinner.style.display = 'none';
+            parent_div.querySelector('.solvent_vol').focus();
         })
         .catch((error) => {
             console.log('Error', error)
@@ -304,4 +308,21 @@ function save_child() {
     .catch((error) => {
         console.log('Error', error)
     })
+}
+
+function calculate_mass(event) {
+    event.preventDefault();
+    const target = event.target;
+    const molarity = target.value;
+    if (event.key === 'Enter') {
+        const parent_div = target.parentElement.parentElement;
+        const spinner = target.parentElement.querySelector('.spinner');
+        const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
+        const volume = document.querySelector('#volume').value;
+        parent_div.querySelector('.salt_mass').value = molarity * volume * molar_mass/ 1000;
+        parent_div.querySelector('salt_ambient_temp').focus();
+    } else {
+        target.value += event.key;
+    }
+
 }

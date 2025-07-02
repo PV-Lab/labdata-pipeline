@@ -9,6 +9,9 @@
 <div>
     Date Created: <strong><span id="date">{{date}}</span></strong>
 </div>
+<div>
+    Total volume (ml): <input id="volume" type="number" value="{{ total_volume }}" disabled>
+</div>
 <div id="salts">
     <h3>Salts</h3>
 <div id="salt_content">
@@ -26,6 +29,9 @@
         </div>
         <div>
             Molar mass (g/mol): <input class="salt_molar_mass" type="number" value="{{ salt['molar_mass'] }}" disabled>
+        </div>
+        <div>
+            Desired molarity: <input class="salt_desired_molarity" type="number" value="{{ salt['desired_molarity'] }}" disabled>
         </div>
         <div>
             Mass (g): <input class="salt_mass" type="number" value="{{ salt['mass'] }}" disabled>
@@ -64,9 +70,6 @@
                     Concentration: <input class="solvent_concentration" type="text" value="{{ solvent['concentration'] }}" disabled>
                 </div>
                 <div>
-                    Desired molarity: <input class="solvent_molarity" type="number" value="{{ solvent['desired_molarity'] }}" disabled>
-                </div>
-                <div>
                     Volume added (ml): <input class="solvent_vol" type="number" value="{{ solvent['vol_added'] }}" disabled>
                 </div>
                 <div>
@@ -88,7 +91,10 @@
     </div>
     <button id="add_solvent" onclick="add_solvent(event)">Add Solvent</button>
 </div>
-<div id="message"></div>
-<button id="save" onclick="save_edit()">Save to dropbox</button> <span class="spinner"></span>
+<div>
+    <div id="message"></div>
+    <button id="save" onclick="save_edit()">Save to dropbox</button> <span class="spinner"></span>
+</div>
+
 
 {% endblock %}

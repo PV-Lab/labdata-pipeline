@@ -44,21 +44,21 @@ except:
     raise HTTPException(status_code=400, detail={'detail': 'Inventory not found'})
 
 FIELDNAMES = ["Date", "Executer", "Barcode on the salt", "Salt name",
-                  "Chemical formula", "Salt Molecular Weight in g/mol", "Mass of salt added in the vial in g",
+                  "Chemical formula", "Salt Molecular Weight in g/mol", "Desired molarity", "Mass of salt added in the vial in g",
                   "Ambient temperature in glovebox (C)", "Ambient humidity in glovebox (%)",
                   "Salt receipt date",  "Barcode on the solvent", "Name of the solvent", "Concentration of the solvent (%)",
-                  "Vol of solvent added (ml)", "Desired molarity",
+                  "Vol of solvent added (ml)",
                   "Ambient temperature (C)", "Ambient humidity (%)", "Stir Time (min)", "Solvent receipt date",
-                  "Barcode of Vial",
+                  "Barcode of Vial", "Total volume (ml)",
                   ]
 
-PROPERTIES_TO_FIELDMAMES = {'general': {'executer': "Executer", 'barcode': "Barcode of Vial", 'date': "Date"},
+PROPERTIES_TO_FIELDMAMES = {'general': {'executer': "Executer", 'barcode': "Barcode of Vial", 'date': "Date", 'total_volume': "Total volume (ml)",},
                             'salts': {'name': "Salt name", 'barcode': "Barcode on the salt", "chemical_formula": "Chemical formula",
                                     "molar_mass": "Salt Molecular Weight in g/mol", "mass": "Mass of salt added in the vial in g",
                                     'ambient_temp': "Ambient temperature in glovebox (C)", 'ambient_humidity': "Ambient humidity in glovebox (%)",
-                                    'receipt_date': 'Salt receipt date'},
+                                    'receipt_date': 'Salt receipt date', 'desired_molarity': "Desired molarity"},
                             'solvents': {'barcode': "Barcode on the solvent", 'name': "Name of the solvent", 'concentration': "Concentration of the solvent (%)",
-                                         'vol_added': "Vol of solvent added (ml)", 'desired_molarity': "Desired molarity",
+                                         'vol_added': "Vol of solvent added (ml)",
                                          'ambient_temp': "Ambient temperature (C)", 'ambient_humidity': "Ambient humidity (%)",
                                          'stir_time': "Stir Time (min)", 'receipt_date': 'Solvent receipt date'}
                             }
@@ -74,6 +74,7 @@ class Parent_vial(BaseModel):
     barcode: str
     solvents: list
     salts: list
+    total_volume: int
 
 
 class Salt(BaseModel):
@@ -183,10 +184,7 @@ async def create_child(request: Request):
 
 # Creates and uploads the parent metadata to dropbox
 def save_parent(parent):
-    data = [{'Date': parent.date,
-             "Barcode of Vial": str(parent.barcode),
-            'Executer': parent.executer,
-            },]
+    data = [{},]
 
     # for each general attribute, add the data to the fieldname
     for attribute, fieldname in PROPERTIES_TO_FIELDMAMES['general'].items():
