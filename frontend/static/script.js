@@ -251,6 +251,23 @@ function search_salt_barcode(event) {
     };
 }
 
+function calculate_mass(event) {
+    event.preventDefault();
+    const target = event.target;
+    const molarity = target.value;
+    if (event.key === 'Enter') {
+        const parent_div = target.parentElement.parentElement;
+        const spinner = target.parentElement.querySelector('.spinner');
+        const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
+        const volume = document.querySelector('#volume').value;
+        parent_div.querySelector('.salt_mass').value = molarity * volume * molar_mass/ 1000;
+        parent_div.querySelector('salt_ambient_temp').focus();
+    } else {
+        target.value += event.key;
+    }
+
+}
+
 function search_solvent(event) {
     event.preventDefault();
     target = event.target;
@@ -279,12 +296,20 @@ function search_solvent(event) {
 
 
 function save_child() {
+    const message_div = document.querySelector('#message');
+    const spinner = message_div.parentElement.querySelector('.spinner');
+    spinner.style.display = 'inline-block';
     let child = {};
+    child.parents = [];
     child.date = document.querySelector('.date').innerHTML;
     console.log(child);
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
-        child[input.className] = input.value;
+        if (input.className === 'parent') {
+            child['parents'].push(input.value);
+        } else {
+            child[input.className] = input.value;
+        }
     });
     console.log(child);
     fetch('/create/child', {
@@ -298,31 +323,21 @@ function save_child() {
     .then((data) => {
         console.log(data);
         if (data.detail === 'Uploaded successfully') {
-            const message_div = document.querySelector('#message');
             message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
         } else {
-            const message_div = document.querySelector('#message');
             message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
         }
+        spinner.style.display = 'none';
     })
     .catch((error) => {
         console.log('Error', error)
     })
 }
 
-function calculate_mass(event) {
-    event.preventDefault();
-    const target = event.target;
-    const molarity = target.value;
-    if (event.key === 'Enter') {
-        const parent_div = target.parentElement.parentElement;
-        const spinner = target.parentElement.querySelector('.spinner');
-        const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
-        const volume = document.querySelector('#volume').value;
-        parent_div.querySelector('.salt_mass').value = molarity * volume * molar_mass/ 1000;
-        parent_div.querySelector('salt_ambient_temp').focus();
-    } else {
-        target.value += event.key;
-    }
-
+function add_parent(event) {
+    target = event.target;
+    new_div = document.createElement('div');
+    new_div.className = 'parent';
+    new_div.innerHTML = `Parent barcode: <input class="parent" type="text">`;
+    target.parentElement.querySelector('#parents').appendChild(new_div);
 }

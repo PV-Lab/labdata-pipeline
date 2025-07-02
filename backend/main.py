@@ -63,10 +63,10 @@ PROPERTIES_TO_FIELDMAMES = {'general': {'executer': "Executer", 'barcode': "Barc
                                          'stir_time': "Stir Time (min)", 'receipt_date': 'Solvent receipt date'}
                             }
 
-CHILD_FIELDNAMES = ["Date", "Executer", "Barcode on holder", "Parent 1 barcode", "Parent 2 barcode", "Ambient temperature (C)", "Ambient humidity (%)"]
+CHILD_FIELDNAMES = ["Date", "Executer", "Barcode on holder", "Parents", "Ambient temperature (C)", "Ambient humidity (%)"]
 
-CHILD_PROPERTIES_TO_FIELDNAMES = {'date': "Date", 'executer': "Executer", 'barcode': "Barcode on holder", 'parent_1': "Parent 1 barcode",
-                                  'parent_2': "Parent 2 barcode", 'ambient_temp': "Ambient temperature (C)", 'ambient_humidity': "Ambient humidity (%)"}
+CHILD_PROPERTIES_TO_FIELDNAMES = {'date': "Date", 'executer': "Executer", 'barcode': "Barcode on holder",
+                                  'ambient_temp': "Ambient temperature (C)", 'ambient_humidity': "Ambient humidity (%)"}
 
 class Parent_vial(BaseModel):
     date: str
@@ -76,30 +76,11 @@ class Parent_vial(BaseModel):
     salts: list
     total_volume: int
 
-
-class Salt(BaseModel):
-    barcode: str
-    name: str
-    chemical_formula: str
-    molar_mass: float
-    mass: float
-    ambient_temp: float
-
-class Solvent(BaseModel):
-    barcode: str
-    name: str
-    vol_added: float
-    desired_molarity: float
-    ambient_temp: float
-    ambient_humidity: float
-    stir_time: float
-
 class Child(BaseModel):
     barcode: str
     executer: str
     date: str
-    parent_1: str
-    parent_2: str
+    parents: list
     ambient_temp: float
     ambient_humidity: float
 
@@ -295,6 +276,11 @@ def save_child(child: Child):
     for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
         data[0][fieldname] = child.__getattribute__(attribute)
 
+    for i, parent in enumerate(child.parents):
+        if i > len(data) - 1:
+            data.append({})
+        data[i]['Parents'] = parent
+
     csv_buffer = StringIO()
     writer = csv.DictWriter(csv_buffer, fieldnames=CHILD_FIELDNAMES)
     writer.writeheader()
@@ -308,13 +294,18 @@ def save_child(child: Child):
         return {'detail': 'Upload failed', 'error': e}
 
 @app.get('/view/child', response_class=HTMLResponse)
-async def get_parent(request: Request, barcode: str):
+async def get_child(request: Request, barcode: str):
     df, path = download(barcode, '/child_vials')
     output = {}
+    output['parents'] = []
     for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
         output[attribute] = df.iloc[0][fieldname]
+    no_parents = df['Parents'].count()
+    for i in range(no_parents):
+        output['parents'].append(df.iloc[i]['Parents'])
     return templates.TemplateResponse('view_child.html', {'request': request} | output)
 
 @app.get('/search/child', response_class=HTMLResponse)
 async def search_child(request: Request):
     return templates.TemplateResponse('search_child.html', {'request': request})
+

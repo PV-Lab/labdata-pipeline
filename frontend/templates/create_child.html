@@ -12,10 +12,12 @@
 <div>
     <h4>Parent vials:</h4>
     <div>
-        Parent vial 1 barcode: <input class="parent_1" type="text">
-    </div>
-    <div>
-        Parent vial 2 barcode: <input class="parent_2" type="text">
+        <div id="parents">
+            <div>
+                Parent barcode: <input class="parent" type="text">
+            </div>
+        </div>
+        <button onclick="add_parent(event)">Add parent</button>
     </div>
 </div>
 <hr>
@@ -25,6 +27,8 @@
 <div>
     Ambient humidity (%): <input class="ambient_humidity" type="number">
 </div>
-<button onclick="save_child()">Save to dropbox</button>
 <div id="message"></div>
+<div>
+    <button onclick="save_child()">Save to dropbox</button> <span class="spinner"></span>
+</div>
 {% endblock %}

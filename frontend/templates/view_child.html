@@ -12,10 +12,13 @@
 <div>
     <h4>Parent vials:</h4>
     <div>
-        Parent vial 1 barcode: <a href="/parent?parent_barcode={{ parent_1 }}">{{ parent_1}}</a>
-    </div>
-    <div>
-        Parent vial 2 barcode: <a href="/parent?parent_barcode={{ parent_2 }}">{{ parent_2}}</a>
+        {% for parent in parents %}
+        <div id="parents">
+            <div>
+                Parent barcode: <input class="parent" type="text" value="{{ parent }}" disabled>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 </div>
 <hr>
