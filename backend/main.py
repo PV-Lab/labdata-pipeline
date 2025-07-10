@@ -27,8 +27,6 @@ dbx = dropbox.Dropbox(app_key=DROPBOX_APP_KEY,
                       app_secret=DROPBOX_APP_SECRET,
                       oauth2_refresh_token=DROPBOX_REFRESH_TOKEN)
 
-# dbx = dropbox.Dropbox('sl.u.AF3e4ArKRb0b4Dpr25F6gDh70zQ9X3_wDPhb4RDzgbcJkxF8xOlIzPoBUKqiBqUN_M_xg7-765e8UFNA1N_kbI5N8VXmZWfb-xCYwjtD5Ee7Hzh6CtUSgr7EUdA6xBC7QKTNzjlBvNJyH8kf_pioCwHYWf2NZvLtJ21kirh8XjY5bg5QPMkIHoFHgn-Y278jhnLgUrW1bSumYkNygmK2y9Nwuc5oYcNqF6K--AiiNSjJH0PaerI6y1-keNIrW_L3YvrOJZ5LYNBtUOvgRGNTeHLzLlXjvAAErC6_7qCbdPWLpS7yXRS8B8tMrZcr80eVVRhSQA6yIst3On3_f5thwFEPdmYZh-xD1XcdvaIYCmB5XzZlfsCZtRk2Tzl7uQc3WeXf5yTSccMFaPvEKIhemiBksqbJeNx9v0FuxWPZkRbEjRC9Rw4AuRAVQ0vgdVsA504dfft_n-gQBurmhda6v0pmtdgU6gHr61cF2TUn2wXp8S98S11zvqOrCJge-OdIxIpHoa_7gDHhkmUoZ1Zr9tN7_Q3vbHSFcSQM4F4tF9FyoRfAbaQlq4Zrt7CKX5cVs7TW3Utgx-gKRapY4HHQIs8FCj6ZtPiGorCvYBrNkmV89igNrN_V2_k5JvB7DoUGwY3CmoX5mGKQKZB7F7-BPSHxITvlheMgKXfBfUiDEnoh7MjJ7lqMInVhyHEpP_7hyS7xV8XWOHyxWFgUUQPVYtPafCHufjzFptQAzskYAQjl2MiXWAlpp6FbVEPouNwOLZtyl_lWfRe4annbNF7EfwW7osvb3fRYOR4XyVay_z_7c2OKl72zyEq3xRHT0FJZ-R9qEsc7sn_T66PozW_mFho_FJe7_KbAO6a5hKbZYzGV5z6dLPE9pAp9dpnPbAEanHITDlhrhoVrEZMMqsV37NfZDOdoeaCT7rkU8hrYVdjYg2x9si3dke6tYEnoJhDdU1E9MqMoO_Izn25p8kNA0QWeTPKvUqwDnPUoIgB5N1ITZEO2Ot2N-Z6bAeX3f9nObM4qh-nbX68GsIgj7NRjvHGmWJSxExklRj-Ftl0UGxiJ2OajkKgv6VoeXwnGYfxiWfUM96Yg_AZVzAR-QrrfAW99Cm1_UPchtOjt7mpqcqnLH48LEX4n393MG2umRHWS3dBKoAd0kFfl8phtywxYvxWECnyPP0BgvirjFv8YUfYO6837wpKOlEY78DbsVyGsnWYWxpNbxcAQTGtdUKjN_xZgoNzdEqhxw1bUyKhHnDr14Z22DLiPwuafb9aIuA1UxZlJNbgkONrFkalA1M1og9lw')
-
 account = dbx.users_get_current_account()
 team_namespace_id = account.root_info.root_namespace_id
 dbx = dbx.with_path_root(dropbox.common.PathRoot.namespace_id(team_namespace_id))
@@ -68,6 +66,13 @@ CHILD_FIELDNAMES = ["Date", "Executer", "Barcode on holder", "Parents", "Ambient
 CHILD_PROPERTIES_TO_FIELDNAMES = {'date': "Date", 'executer': "Executer", 'barcode': "Barcode on holder",
                                   'ambient_temp': "Ambient temperature (C)", 'ambient_humidity': "Ambient humidity (%)"}
 
+PLATE_FIELDNAMES = ["Date", "Executer", "Sample plate barcode", "Precursor vial barcode", "Washed", "Washed in", 'Ozone treatment', 'Ozone treatment time (min)', 'Sample type', 'Dropcast volume (ml)', 'Dropcasting temperature (C)', "Dropcast Ambient temp (C)", "Dropcast Ambient humidity (%)", 'Dropcast drying temp (C)', 'Dropcast drying time (min)', "Spuncoat spin speed (RPM)", 'Spuncoat volume (ml)', "Annealing temp (C)", "Annealing time (min)", "Ambient temp at anneal (C)", "Ambient Humidity at anneal (%)",]
+
+PLATE_PROPERTIES_TO_FIELDNAMES = {'general': {'date': "Date", 'barcode': "Sample plate barcode", 'executer': "Executer", 'precursor': "Precursor vial barcode"},
+                                  'props':{"anneal_ambient_humidity": "Ambient Humidity at anneal (%)", "anneal_ambient_temp": "Ambient temp at anneal (C)", "annealing_temp": "Annealing temp (C)", "annealing_time": "Annealing time (min)", "ozone": "Ozone treatment", "ozone_time": "Ozone treatment time (min)", "sample_type": "Sample type", "spuncoat_spin_speed": "Spuncoat spin speed (RPM)", "spuncoat_volume": "Spuncoat volume (ml)", "dropcast_ambient_humidity": "Dropcast Ambient humidity (%)", "dropcast_ambient_temp": "Dropcast Ambient temp (C)", "dropcast_drying_temp": "Dropcast drying temp (C)", "dropcast_drying_time": "Dropcast drying time (min)", "dropcast_temp": "Dropcasting temperature (C)", "dropcast_volume": "Dropcast volume (ml)", "washed": "Washed", "washed_in": "Washed in"}
+}
+
+
 class Parent_vial(BaseModel):
     date: str
     executer: str
@@ -84,6 +89,12 @@ class Child(BaseModel):
     ambient_temp: float
     ambient_humidity: float
 
+class Plate(BaseModel):
+    executer: str
+    date: str
+    barcode: str
+    precursor: str
+    props: dict
 
 
 #### helper functions ###
@@ -146,7 +157,9 @@ def get_solvent(solvent_barcode: str):
     except:
         raise HTTPException(status_code=400, detail='Solvent barcode not found')
 
-## Webpages
+#### Parent vials #####
+#######################
+
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse('index.html', {'request': request})
@@ -158,10 +171,6 @@ async def create(request: Request):
 @app.get('/edit', response_class=HTMLResponse)
 async def edit(request: Request):
     return templates.TemplateResponse('edit.html', {'request': request})
-
-@app.get('/create-child', response_class=HTMLResponse)
-async def create_child(request: Request):
-    return templates.TemplateResponse('create_child.html', {'request': request, 'date': datetime.now().date()})
 
 # Creates and uploads the parent metadata to dropbox
 def save_parent(parent):
@@ -270,6 +279,13 @@ async def get_parent(request: Request, parent_barcode: str):
     output['solvents'] = solvents
     return templates.TemplateResponse('edit_vial.html', {'request': request} | output)
 
+#### Child vials #####
+######################
+
+@app.get('/create-child', response_class=HTMLResponse)
+async def create_child(request: Request):
+    return templates.TemplateResponse('create_child.html', {'request': request, 'date': datetime.now().date()})
+
 @app.post('/create/child')
 def save_child(child: Child):
     data = [{}]
@@ -309,3 +325,33 @@ async def get_child(request: Request, barcode: str):
 async def search_child(request: Request):
     return templates.TemplateResponse('search_child.html', {'request': request})
 
+#### Sample plates #####
+########################
+
+@app.get('/create-plate', response_class=HTMLResponse)
+async def create_plate(request: Request):
+    return templates.TemplateResponse('create_plate.html', {'request': request, 'date': datetime.now().date()})
+
+@app.post('/plate')
+async def save_plate(plate: Plate):
+    data = [{},]
+    for attribute, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES['general'].items():
+        data[0][fieldname] = plate.__getattribute__(attribute)
+    for attribute, value in plate.props.items():
+        fieldname = PLATE_PROPERTIES_TO_FIELDNAMES['props'][attribute]
+        data[0][fieldname] = value
+
+    # get fieldnames with that are only available in the given data
+    fieldnames = [fieldname for fieldname in PLATE_FIELDNAMES if fieldname in data[0]]
+
+    csv_buffer = StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(data)
+    csv_buffer.seek(0)
+
+    try:
+        upload_csv_buffer(csv_buffer, f'/sample_plates/{data[0]["Date"]}_{plate.barcode}.csv')
+        return {'detail': 'Uploaded successfully'}
+    except Exception as e:
+        return {'detail': 'Upload failed', 'error': e}

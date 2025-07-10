@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Create a sample plate</h2>
+<div id="general">
+<div>
+    Executer: <input id="executer" type="text">
+</div>
+<div>
+    Date: <strong><span id="date">{{ date }}</span></strong>
+</div>
+<div>
+    Sample plate barcode: <input id="barcode" type="text">
+</div>
+<div>
+    Precursor vial barcode: <input id="precursor" type="text">
+</div>
+</div>
+<hr>
+<div id="props">
+<div style="display: flex;">
+    Washed: <label><input type="radio" name="washed" value="Yes">Yes</label>
+    <label><input type="radio" name="washed" value="No">No</label>
+</div>
+<div id="washed" style="padding-left: 20px;"></div>
+<div style="display: flex;">
+    Ozone treatment: <label><input type="radio" name="ozone" value="Yes">Yes</label>
+    <label><input type="radio" name="ozone" value="No">No</label>
+</div>
+<div id="ozone" style="padding-left: 20px;"></div>
+<div style="display: flex;">
+    Sample type: <label><input type="radio" name="sample_type" value="Dropcast">Dropcast</label>
+    <label><input type="radio" name="sample_type" value="Spuncoat">Spuncoat</label>
+</div>
+<div id="sample_type" style="padding-left: 20px;"></div>
+<div>Annealing</div>
+<div style="padding-left: 20px;">
+    <div>
+        Annealing temperature (C): <input type="number" id="annealing_temp">
+    </div>
+    <div>
+        Annealing time (min): <input type="number" id="annealing_time">
+    </div>
+    <div>
+        Ambient temperature (C): <input type="number" id="anneal_ambient_temp">
+    </div>
+    <div>
+        Ambient humidity (%): <input type="number" id="anneal_ambient_humidity">
+    </div>
+</div>
+<hr>
+<div>
+    Notes: <textarea id="notes"></textarea>
+</div>
+<div>
+    <div id="message"></div>
+    <button id="save_to_dropbox" onclick="save_plate()">Save to dropbox</button> <span class="spinner"></span>
+</div>
+</div>
+{% endblock %}

@@ -1,3 +1,74 @@
+document.addEventListener('DOMContentLoaded', function () {
+    try {
+        const washed_radios = document.querySelectorAll('input[name="washed"]');
+        washed_radios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    if (radio.value === 'Yes') {
+                        document.querySelector('#washed').innerHTML = `In what: <input type="text" id="washed_in">`;
+                        document.querySelector('#washed_in').focus();
+                    } else {
+                        document.querySelector('#washed').innerHTML = '';
+                    }
+                }
+            });
+        });
+        const ozone_radios = document.querySelectorAll('input[name="ozone"]');
+        ozone_radios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    if (radio.value === 'Yes') {
+                        document.querySelector('#ozone').innerHTML = `Time treated (min): <input type="text" id="ozone_time">`;
+                        document.querySelector('#ozone_time').focus();
+                    } else {
+                        document.querySelector('#ozone').innerHTML = '';
+                    }
+                }
+            });
+        });
+        const sample_type_radios = document.querySelectorAll('input[name="sample_type"]')
+        sample_type_radios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                if (radio.checked) {
+                    if (radio.value === 'Dropcast') {
+                        document.querySelector('#sample_type').innerHTML = `<div>
+                        <div>
+                        Dropcast volume (ml): <input type="number" id="dropcast_volume">
+                        </div>
+                        <div>
+                        Dropcasting temperature (C): <input type="number" id="dropcast_temp">
+                        </div>
+                        <div>
+                        Ambient temperature (C): <input type="number" id="dropcast_ambient_temp">
+                        </div>
+                        <div>
+                        Ambient humidity (%): <input type="number" id="dropcast_ambient_humidity">
+                        </div>
+                        <div>
+                        Drying temperature (C): <input type="number" id="dropcast_drying_temp">
+                        </div>
+                        <div>
+                        Drying time (min): <input type="number" id="dropcast_drying_time">
+                        </div>
+                        </div>`;
+                        document.querySelector('#dropcast_volume').focus();
+                    } else {
+                        document.querySelector('#sample_type').innerHTML = `
+                        <div>
+                        <div>Droplet volume (ml): <input type="number" id="spuncoat_volume"></div>
+                        <div>Spin speed (RPM): <input type="number" id="spuncoat_spin_speed"></div>
+                        </div>
+                        `;
+                        document.querySelector('#spuncoat_volume').focus();
+                    }
+                }
+            });
+        });
+    } catch (e) {
+        console.error("Error:", e.message);
+    }
+})
+
 // Creates a new form to add an extra salt
 function add_salt(event) {
     const element = event.target;
@@ -340,4 +411,47 @@ function add_parent(event) {
     new_div.className = 'parent';
     new_div.innerHTML = `Parent barcode: <input class="parent" type="text">`;
     target.parentElement.querySelector('#parents').appendChild(new_div);
+}
+
+// Create a plate
+function save_plate() {
+    plate = {};
+    plate['props'] = {};
+    general = document.querySelector('#general');
+    const general_inputs = general.querySelectorAll('input');
+    const props = document.querySelector('#props').querySelectorAll('input');
+    const message_div = document.querySelector('#message');
+    const spinner = message_div.parentElement.querySelector('.spinner');
+    general_inputs.forEach(input => {
+        plate[input.id] = input.value;
+    });
+    plate.date = general.querySelector('#date').innerHTML;
+    props.forEach(input => {
+        if (input.type === 'radio' ) {
+            if (input.checked) {
+                plate['props'][input.name] = input.value;
+            }
+        } else {
+            plate['props'][input.id] = input.value;
+        }
+    });
+    console.log(plate)
+    spinner.style.display = 'inline-block';
+    fetch('/plate', {
+        'method': 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(plate),
+    })
+    .then((response) => response.json())
+    .then((data) => {
+        console.log(data);
+        if (data.detail === 'Uploaded successfully') {
+            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+        } else {
+            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+        }
+        spinner.style.display = 'none';
+    });
 }
