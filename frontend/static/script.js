@@ -455,3 +455,52 @@ function save_plate() {
         spinner.style.display = 'none';
     });
 }
+
+// Profiles
+function add_directory(event) {
+    directories_div = event.target.parentElement.parentElement.querySelector('.directories');
+    new_div = document.createElement('div')
+    new_div.innerHTML = '<input type="text" class="long-input"> <span class="close-btn" onclick="remove_directory(event)">&times;</span>'
+    directories_div.appendChild(new_div)
+    new_div.querySelector('input').focus();
+}
+
+function remove_directory(event) {
+    event.target.parentElement.remove();
+}
+
+function save_profile() {
+    const name = document.querySelector('#name').value;
+    let profile = {'name': name};
+    sections = ['parent', 'child', 'sample']
+    sections.forEach((section) => {
+        profile[section] = [];
+        section_div = document.querySelector(`#${section}`)
+        inputs = section_div.querySelector('.directories').querySelectorAll('input');
+        inputs.forEach((input) => {
+            if (input.value != '') {
+                profile[section].push(input.value)
+            }
+        });
+    });
+    const message_div = document.querySelector('#message');
+    const spinner = message_div.parentElement.querySelector('.spinner');
+    spinner.style.display = 'inline-block';
+    fetch('/profile', {
+        'method': 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profile),
+    })
+    .then((response) => response.json())
+    .then((data) => {
+        console.log(data);
+        if (data.detail === 'Uploaded successfully') {
+            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+        } else {
+            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+        }
+        spinner.style.display = 'none';
+    });
+}

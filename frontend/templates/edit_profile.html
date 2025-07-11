@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block body %}
+<h3>Create a new profile</h3>
+<div>Name: <input type="text" id="name" autofocus value="{{ name }}" disabled></div>
+<div id="parent">
+    <h5>Parent vial storage directories</h5>
+    <div class="directories">
+        {% for directory in parent %}
+        <div><input type="text" class="long-input" value="{{ directory }}">
+            <span class="close-btn" onclick="remove_directory(event)">&times;</span>
+        </div>
+        {% endfor %}
+    </div>
+    <div><button onclick="add_directory(event)">Add directory</button></div>
+</div>
+
+<div id="child">
+    <h5>Child vial storage directories</h5>
+    <div class="directories">
+        {% for directory in child %}
+        <div><input type="text" class="long-input" value="{{ directory }}">
+        <span class="close-btn" onclick="remove_directory(event)">&times;</span>
+        </div>
+        {% endfor %}
+    </div>
+    <div><button onclick="add_directory(event)">Add directory</button></div>
+</div>
+<div id="sample">
+    <h5>Sample plates storage directories</h5>
+    <div class="directories">
+        {% for directory in sample %}
+        <div><input type="text" class="long-input" value="{{ directory }}">
+        <span class="close-btn" onclick="remove_directory(event)">&times;</span>
+        </div>
+        {% endfor %}
+    </div>
+    <div><button onclick="add_directory(event)">Add directory</button></div>
+</div>
+<div>
+    <div id="message"></div>
+    <div>
+        <button class="save-button" onclick="save_profile()">Save</button> <span class="spinner"></span>
+    </div>
+</div>
+{% endblock %}

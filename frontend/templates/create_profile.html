@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block body %}
+<h3>Create a new profile</h3>
+<div>Name: <input type="text" id="name" autofocus></div>
+<div id="parent">
+    <h5>Parent vial storage directories</h5>
+    <div class="directories"></div>
+    <div><button onclick="add_directory(event)">Add directory</button></div>
+</div>
+
+<div id="child">
+    <h5>Child vial storage directories</h5>
+    <div class="directories"></div>
+    <div><button onclick="add_directory(event)">Add directory</button></div>
+</div>
+<div id="sample">
+    <h5>Sample plates storage directories</h5>
+    <div class="directories"></div>
+    <div><button onclick="add_directory(event)">Add directory</button></div>
+</div>
+<div>
+    <div id="message"></div>
+    <div>
+        <button class="save-button" onclick="save_profile()">Save</button> <span class="spinner"></span>
+    </div>
+</div>
+{% endblock %}

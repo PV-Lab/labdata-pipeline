@@ -35,12 +35,6 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 templates = Jinja2Templates(directory="frontend/templates")
 
-### Import inventory
-try:
-    INVENTORY = pd.read_excel('backend/current_inventory.xlsx')
-except:
-    raise HTTPException(status_code=400, detail={'detail': 'Inventory not found'})
-
 FIELDNAMES = ["Date", "Executer", "Barcode on the salt", "Salt name",
                   "Chemical formula", "Salt Molecular Weight in g/mol", "Desired molarity", "Mass of salt added in the vial in g",
                   "Ambient temperature in glovebox (C)", "Ambient humidity in glovebox (%)",
@@ -72,6 +66,10 @@ PLATE_PROPERTIES_TO_FIELDNAMES = {'general': {'date': "Date", 'barcode': "Sample
                                   'props':{"anneal_ambient_humidity": "Ambient Humidity at anneal (%)", "anneal_ambient_temp": "Ambient temp at anneal (C)", "annealing_temp": "Annealing temp (C)", "annealing_time": "Annealing time (min)", "ozone": "Ozone treatment", "ozone_time": "Ozone treatment time (min)", "sample_type": "Sample type", "spuncoat_spin_speed": "Spuncoat spin speed (RPM)", "spuncoat_volume": "Spuncoat volume (ml)", "dropcast_ambient_humidity": "Dropcast Ambient humidity (%)", "dropcast_ambient_temp": "Dropcast Ambient temp (C)", "dropcast_drying_temp": "Dropcast drying temp (C)", "dropcast_drying_time": "Dropcast drying time (min)", "dropcast_temp": "Dropcasting temperature (C)", "dropcast_volume": "Dropcast volume (ml)", "washed": "Washed", "washed_in": "Washed in"}
 }
 
+PROFILE_FIELDNAMES = ['Name', 'Parent vial directories', 'Child vial directories', 'Sample plate directories']
+
+PROFILE_PROPERTIES_TO_FIELDNAMES = {'name': 'Name', 'parent': 'Parent vial directories',
+                                    'child': 'Child vial directories', 'sample': 'Sample plate directories'}
 
 class Parent_vial(BaseModel):
     date: str
@@ -95,6 +93,12 @@ class Plate(BaseModel):
     barcode: str
     precursor: str
     props: dict
+
+class Profile(BaseModel):
+    name: str
+    parent: list
+    child: list
+    sample: list
 
 
 #### helper functions ###
@@ -235,16 +239,16 @@ def search_parent_barcode(parent_barcode, parent_folder='/parent_vials'):
     result = dbx.files_search_v2(query=str(parent_barcode), options=options)
     return result.matches
 
-def download(parent_barcode, parent_folder='/parent_vials'):
+def download(name, parent_folder='/parent_vials'):
     """
     Downloads the file with the given barcode,
     Returns the data frame and the file path
     """
-    matches = search_parent_barcode(parent_barcode, parent_folder)
+    matches = search_parent_barcode(name, parent_folder)
     if len(matches) == 0:
-        raise HTTPException(status_code=404, detail=f'Vial with barcode {parent_barcode} does not exist')
+        raise HTTPException(status_code=404, detail=f'Vial with barcode {name} does not exist')
     if len(matches) > 1:
-        raise HTTPException(status_code=400, detail=f'There are multiple vials with the barcode {parent_barcode}')
+        raise HTTPException(status_code=400, detail=f'There are multiple vials with the barcode {name}')
     match = matches[0]
     path = match.metadata.get_metadata().path_display
     metadata, response = dbx.files_download(path)
@@ -355,3 +359,83 @@ async def save_plate(plate: Plate):
         return {'detail': 'Uploaded successfully'}
     except Exception as e:
         return {'detail': 'Upload failed', 'error': e}
+
+### Profiles ####
+#################
+@app.get('/profiles', response_class=HTMLResponse)
+async def list_profiles(request: Request):
+    profiles = all_file_names('/profiles')
+    return templates.TemplateResponse('profiles.html', {'request': request, 'profiles': profiles})
+
+@app.get('/create-profile', response_class=HTMLResponse)
+async def create_profile(request: Request):
+    return templates.TemplateResponse('create_profile.html', {'request': request})
+
+@app.post('/profile')
+def save_profile(profile: Profile):
+    data = [{}]
+    data[0]['Name'] = profile.name
+    for i, directory in enumerate(profile.parent):
+        if i > len(data) - 1:
+            data.append({})
+        fieldname = PROFILE_PROPERTIES_TO_FIELDNAMES['parent']
+        data[i][fieldname] = directory
+
+    for i, directory in enumerate(profile.child):
+        if i > len(data) - 1:
+            data.append({})
+        fieldname = PROFILE_PROPERTIES_TO_FIELDNAMES['child']
+        data[i][fieldname] = directory
+
+    for i, directory in enumerate(profile.sample):
+        if i > len(data) - 1:
+            data.append({})
+        fieldname = PROFILE_PROPERTIES_TO_FIELDNAMES['sample']
+        data[i][fieldname] = directory
+
+    csv_buffer = StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=PROFILE_FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(data)
+    csv_buffer.seek(0)
+
+    try:
+        upload_csv_buffer(csv_buffer, f'/profiles/{profile.name}.csv')
+        return {'detail': 'Uploaded successfully'}
+    except Exception as e:
+        return {'detail': 'Upload failed', 'error': e}
+
+def all_file_names(directory):
+    """
+    Returns all file names in the given directory sorted in alphabetical order
+    """
+    path = PARENT_PATH + directory
+    entries = []
+    try:
+        result = dbx.files_list_folder(path)
+        entries.extend(result.entries)
+
+        while result.has_more:
+            result = dbx.files_list_folder_continue(result.cursor)
+            entries.extend(result.entries)
+
+        file_names = [entry.name[:-4] for entry in entries if isinstance(entry, dropbox.files.FileMetadata)]
+        return sorted(file_names)
+
+    except dropbox.exceptions.ApiError as err:
+        print("API error:", err)
+        return []
+
+@app.get('/profile/{profile_name}', response_class=HTMLResponse)
+async def edit_profile(request: Request, profile_name: str):
+    df, path = download(profile_name, '/profiles')
+    output = {}
+    output['name'] = df.iloc[0]['Name']
+    sections = ['parent', 'child', 'sample']
+    for section in sections:
+        fieldname = PROFILE_PROPERTIES_TO_FIELDNAMES[section]
+        output[section] = []
+        count = df[fieldname].count()
+        for i in range(count):
+            output[section].append(df.iloc[i][fieldname])
+    return templates.TemplateResponse('edit_profile.html', {'request': request,} | output)

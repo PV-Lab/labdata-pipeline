@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block body %}
+<h3>Existing profiles</h3>
+<ul>
+    {% for profile in profiles%}
+    <li><a href="/profile/{{ profile }}">{{ profile }}</a></li>
+    {% endfor %}
+</ul>
+<div>
+    <a href="/create-profile"><strong>Create a new profile</strong></a>
+</div>
+{% endblock %}
