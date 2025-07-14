@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (radio.value === 'Dropcast') {
                         document.querySelector('#sample_type').innerHTML = `<div>
                         <div>
-                        Dropcast volume (ml): <input type="number" id="dropcast_volume">
+                        Droplet volume (ml): <input type="number" id="dropcast_droplet_volume">
                         </div>
                         <div>
                         Dropcasting temperature (C): <input type="number" id="dropcast_temp">
@@ -55,8 +55,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else {
                         document.querySelector('#sample_type').innerHTML = `
                         <div>
-                        <div>Droplet volume (ml): <input type="number" id="spuncoat_volume"></div>
+                        <div>Droplet volume (ml): <input type="number" id="spuncoat_droplet_volume"></div>
                         <div>Spin speed (RPM): <input type="number" id="spuncoat_spin_speed"></div>
+                        <div>Spin acceleration: <input type="number" id="spuncoat_spin_acceleration"></div>
+                        <div>Spin time (min): <input type="number" id="spuncoat_spin_time"></div>
+                        <div>Ambient temperature (C): <input type="number" id="spuncoat_ambient_temp"></div>
+                        <div>Ambient humidity (%): <input type="number" id="spuncoat_ambient_humidity"></div>
                         </div>
                         `;
                         document.querySelector('#spuncoat_volume').focus();
@@ -157,6 +161,7 @@ function create_parent_object() {
     const barcode = document.querySelector('#parent_barcode').value;
     const date = document.querySelector('#date').innerHTML;
     const total_volume = document.querySelector('#volume').value;
+    const directory = document.querySelector('#directory').value;
     let salts = [];
     let solvents = [];
     salts_div.querySelectorAll('.salt').forEach(function(div) {
@@ -199,6 +204,7 @@ function create_parent_object() {
             total_volume: total_volume,
             salts: salts,
             solvents: solvents,
+            directory: directory,
         };
 }
 
@@ -372,14 +378,16 @@ function save_child() {
     spinner.style.display = 'inline-block';
     let child = {};
     child.parents = [];
-    child.date = document.querySelector('.date').innerHTML;
+    child.executer = document.querySelector('#executer').value;
+    child.date = document.querySelector('#date').innerHTML;
+    child.directory = document.querySelector('#directory').value;
     console.log(child);
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
         if (input.className === 'parent') {
             child['parents'].push(input.value);
         } else {
-            child[input.className] = input.value;
+            child[input.id] = input.value;
         }
     });
     console.log(child);
@@ -425,7 +433,9 @@ function save_plate() {
     general_inputs.forEach(input => {
         plate[input.id] = input.value;
     });
+    plate.executer = document.querySelector('#executer').value;
     plate.date = general.querySelector('#date').innerHTML;
+    plate.directory = document.querySelector('#directory').value;
     props.forEach(input => {
         if (input.type === 'radio' ) {
             if (input.checked) {
@@ -503,4 +513,24 @@ function save_profile() {
         }
         spinner.style.display = 'none';
     });
+}
+
+function handleprofile(profile, type) {
+    if (profile != '') {
+        const params = new URLSearchParams({
+            profile: profile,
+            type: type
+        });
+        fetch(`/directories?${params}`)
+        .then(response => response.json())
+        .then((data) => {
+            const dropdown = document.querySelector('#directory');
+            let options = '<option value="">Select directory</option>';
+            data['directories'].forEach((directory) => {
+                options += `<option value="${directory}">${directory}</option>`
+            });
+            dropdown.innerHTML = options;
+        })
+        .catch(error => console.error("Error", error))
+    }
 }

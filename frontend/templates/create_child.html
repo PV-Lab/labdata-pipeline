@@ -2,13 +2,18 @@
 {% block body %}
 <h2>Create a set of child vials</h2>
 <div>
-    Executer: <input class="executer" type="text">
+    Executer: <select id="executer" name="executer" onchange="handleprofile(this.value, 'child')">
+        <option value=''>Select executer</option>
+        {% for profile in profiles %}
+        <option value="{{ profile }}">{{ profile }}</option>
+        {% endfor %}
+    </select>
 </div>
 <div>
-    Enter the child vials holder barcode: <input class="barcode" type="text">
+    Enter the child vials holder barcode: <input id="barcode" type="text">
 </div>
 <div>
-    Date: <strong><span class="date">{{ date }}</span></strong>
+    Date: <strong><span id="date">{{ date }}</span></strong>
 </div>
 <div>
     <h4>Parent vials:</h4>
@@ -23,10 +28,15 @@
 </div>
 <hr>
 <div>
-    Ambient temperature (C): <input class="ambient_temp" type="number">
+    Ambient temperature (C): <input id="ambient_temp" type="number">
 </div>
 <div>
-    Ambient humidity (%): <input class="ambient_humidity" type="number">
+    Ambient humidity (%): <input id="ambient_humidity" type="number">
+</div>
+<div>
+    Save copy to: <select id="directory" name="directory" class="save-button long-input">
+        <option value="">Select directory</option>
+    </select>
 </div>
 <div id="message"></div>
 <div>

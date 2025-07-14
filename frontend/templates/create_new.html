@@ -2,7 +2,12 @@
 {% block body %}
 <h2>Create a parent vial</h2>
 <div>
-    Executer: <input id="executer" type="text">
+    Executer: <select id="executer" name="executer" onchange="handleprofile(this.value, 'parent')">
+        <option value=''>Select executer</option>
+        {% for profile in profiles %}
+        <option value="{{ profile }}">{{ profile }}</option>
+        {% endfor %}
+    </select>
 </div>
 <div>
     Parent vial barcode: <input id="parent_barcode" type="text">
@@ -24,6 +29,11 @@
     <div id="solvent_content">
     </div>
     <button id="add_solvent" onclick="add_solvent(event)">Add Solvent</button>
+</div>
+<div>
+    Save copy to: <select id="directory" name="directory" class="save-button long-input">
+        <option value="">Select directory</option>
+    </select>
 </div>
 <div>
     <div id="message"></div>

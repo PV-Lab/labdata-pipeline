@@ -3,7 +3,12 @@
 <h2>Create a sample plate</h2>
 <div id="general">
 <div>
-    Executer: <input id="executer" type="text">
+    Executer: <select id="executer" name="executer" onchange="handleprofile(this.value, 'sample')">
+        <option value=''>Select executer</option>
+        {% for profile in profiles %}
+        <option value="{{ profile }}">{{ profile }}</option>
+        {% endfor %}
+    </select>
 </div>
 <div>
     Date: <strong><span id="date">{{ date }}</span></strong>
@@ -50,6 +55,11 @@
 <hr>
 <div>
     Notes: <textarea id="notes"></textarea>
+</div>
+<div>
+    Save copy to: <select id="directory" name="directory" class="save-button long-input">
+        <option value="">Select directory</option>
+    </select>
 </div>
 <div>
     <div id="message"></div>
