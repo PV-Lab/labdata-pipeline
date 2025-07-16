@@ -331,16 +331,15 @@ function search_salt_barcode(event) {
 function calculate_mass(event) {
     event.preventDefault();
     const target = event.target;
-    const molarity = target.value;
-    if (event.key === 'Enter') {
+    if (event.key != 'Enter') {
+        target.value += event.key;
+        const molarity = target.value;
         const parent_div = target.parentElement.parentElement;
         const spinner = target.parentElement.querySelector('.spinner');
         const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
         const volume = document.querySelector('#volume').value;
         parent_div.querySelector('.salt_mass').value = molarity * volume * molar_mass/ 1000;
         parent_div.querySelector('salt_ambient_temp').focus();
-    } else {
-        target.value += event.key;
     }
 
 }

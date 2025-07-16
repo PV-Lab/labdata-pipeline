@@ -59,6 +59,7 @@ FIELDNAMES = [
     "Solvent receipt date",
     "Barcode of Vial",
     "Total volume (ml)",
+    "Save copy to",
 ]
 
 PROPERTIES_TO_FIELDMAMES = {
@@ -67,6 +68,7 @@ PROPERTIES_TO_FIELDMAMES = {
         "barcode": "Barcode of Vial",
         "date": "Date",
         "total_volume": "Total volume (ml)",
+        "directory": "Save copy to",
     },
     "salts": {
         "name": "Salt name",
@@ -220,6 +222,11 @@ class Profile(BaseModel):
 
 
 #### Dropbox helper functions ###
+def get_initials(full_name):
+    """
+    Returns the initials of a name
+    """
+    return '.'.join([name[0] for name in full_name.split(' ')])
 def upload_file(local_file_path, dropbox_file_path):
     """
     Uploads local file to the given dropbox file path
@@ -234,13 +241,24 @@ def upload_file(local_file_path, dropbox_file_path):
 
 def upload_csv_buffer(csv_buffer, dropbox_file_path):
     """
-    Uploads a csv buffer to the given dropbox file path
+    Uploads a csv buffer to the given dropbox file path + the parent path
     """
     return dbx.files_upload(
         csv_buffer.getvalue().encode("utf-8"),
         PARENT_PATH + dropbox_file_path,
         mode=dropbox.files.WriteMode("overwrite"),
     )
+
+def upload_csv_buffer_to_path(csv_buffer, dropbox_file_path):
+    """
+    Uploads a csv buffer to the given dropbox file path + the parent path
+    """
+    return dbx.files_upload(
+        csv_buffer.getvalue().encode("utf-8"),
+        dropbox_file_path,
+        mode=dropbox.files.WriteMode("overwrite"),
+    )
+
 
 
 def delete_file(file_path):
@@ -372,7 +390,7 @@ async def edit(request: Request):
 
 
 # Creates and uploads the parent metadata to dropbox
-def save_parent(parent):
+def save_parent(parent: Parent_vial):
     data = [
         {},
     ]
@@ -406,6 +424,9 @@ def save_parent(parent):
     try:
         upload_csv_buffer(
             csv_buffer, f'/Parent vials/{data[0]["Date"]}_{parent.barcode}.csv'
+        )
+        upload_csv_buffer_to_path(
+            csv_buffer, f'{parent.directory}/{data[0]["Date"]}_{parent.barcode}.csv'
         )
         return {"detail": "Uploaded successfully"}
     except Exception as e:
@@ -536,6 +557,9 @@ def save_child(child: Child):
         upload_csv_buffer(
             csv_buffer, f'/Child vials/{data[0]["Date"]}_{child.barcode}.csv'
         )
+        upload_csv_buffer_to_path(
+            csv_buffer, f'{child.directory}/{data[0]["Date"]}_{child.barcode}'
+        )
         return {"detail": "Uploaded successfully"}
     except Exception as e:
         return {"detail": "Upload failed", "error": e}
@@ -586,8 +610,45 @@ async def save_plate(plate: Plate):
         fieldname = PLATE_PROPERTIES_TO_FIELDNAMES["props"][attribute]
         data[0][fieldname] = value
 
-    # get fieldnames with that are only available in the given data
-    # fieldnames = [fieldname for fieldname in PLATE_FIELDNAMES if fieldname in data[0]]
+    sample_types = {'Dropcast': 'dc', 'Spuncoat': 'sc'}
+    sample_type = sample_types[plate.props['sample_type']]
+
+    ## find precursors and copy
+    initials = get_initials(plate.executer)
+    precursor = plate.precursor
+    child_matches = search_parent_barcode(precursor, '/Child vials')
+    new_plate_folder = plate.directory + f'/{plate.date}-{initials}-{plate.barcode}-{sample_type}'
+
+    # Create the folders in the new folders
+    for folder_name in ("General", "Hyperspectral", "SEM/EDS", "XRD"):
+        try:
+            folder_path = new_plate_folder + '/' + folder_name
+            dbx.files_create_folder_v2(folder_path)
+        except:
+            pass
+
+    if len(child_matches) == 1:
+        df, path = download(precursor, '/Child vials')
+        child_file_name = path.split('/')[-1]
+        try:
+            dbx.files_copy_v2(from_path=path, to_path=new_plate_folder + f'/child-vial-{child_file_name}')
+        except:
+            pass
+        parents = df["Parents"].to_list()
+        for parent in parents:
+            try:
+                parent_path = search_parent_barcode(parent, '/Parent vials')[0].metadata.get_metadata().path_display
+                parent_file_name = parent_path.split('/')[-1]
+                dbx.files_copy_v2(from_path=parent_path, to_path=new_plate_folder + f'/parent-vial-{parent_file_name}')
+            except:
+                pass
+    elif len(child_matches) == 0:
+        try:
+            parent_path = search_parent_barcode(precursor, '/Parent vials')[0].metadata.get_metadata().path_display
+            parent_file_name = parent_path.split('/')[-1]
+            dbx.files_copy_v2(from_path=parent_path, to_path=new_plate_folder + f'/parent-vial-{parent_file_name}')
+        except:
+            return {'detail': 'Precursor information not found'}
 
     csv_buffer = StringIO()
     writer = csv.DictWriter(csv_buffer, fieldnames=PLATE_FIELDNAMES)
@@ -598,6 +659,9 @@ async def save_plate(plate: Plate):
     try:
         upload_csv_buffer(
             csv_buffer, f'/Sample plates/{data[0]["Date"]}_{plate.barcode}.csv'
+        )
+        upload_csv_buffer_to_path(
+            csv_buffer, new_plate_folder + f'/sample-{data[0]["Date"]}_{plate.barcode}.csv'
         )
         return {"detail": "Uploaded successfully"}
     except Exception as e:
