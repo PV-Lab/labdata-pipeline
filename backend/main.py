@@ -14,14 +14,15 @@ from io import StringIO
 import numpy as np
 import requests
 
-load_dotenv()
 
+## get API keys
+load_dotenv()
 DROPBOX_APP_KEY = os.getenv("DROPBOX_APP_KEY")
 DROPBOX_APP_SECRET = os.getenv("DROPBOX_APP_SECRET")
 DROPBOX_REFRESH_TOKEN = os.getenv("DROPBOX_REFRESH_TOKEN")
 CHEMICALS_API_KEY = os.getenv("CHEMICALS_API_KEY")
 
-PARENT_PATH = "/Buonassisi-Group/Projects - Active/Labdata-pipeline/Tests"
+PARENT_PATH = "/Buonassisi-Group/Projects - Active/Chemical Tracing"
 
 dbx = dropbox.Dropbox(
     app_key=DROPBOX_APP_KEY,
@@ -100,6 +101,7 @@ CHILD_FIELDNAMES = [
     "Parents",
     "Ambient temperature (C)",
     "Ambient humidity (%)",
+    'Save copy to'
 ]
 
 CHILD_PROPERTIES_TO_FIELDNAMES = {
@@ -108,6 +110,7 @@ CHILD_PROPERTIES_TO_FIELDNAMES = {
     "barcode": "Barcode on holder",
     "ambient_temp": "Ambient temperature (C)",
     "ambient_humidity": "Ambient humidity (%)",
+    'directory': 'Save copy to'
 }
 
 PLATE_FIELDNAMES = [
@@ -136,6 +139,7 @@ PLATE_FIELDNAMES = [
     "Annealing time (min)",
     "Ambient temp at anneal (C)",
     "Ambient Humidity at anneal (%)",
+    "Save copy to"
 ]
 
 PLATE_PROPERTIES_TO_FIELDNAMES = {
@@ -144,6 +148,7 @@ PLATE_PROPERTIES_TO_FIELDNAMES = {
         "barcode": "Sample plate barcode",
         "executer": "Executer",
         "precursor": "Precursor vial barcode",
+        'directory': 'Save copy to'
     },
     "props": {
         "anneal_ambient_humidity": "Ambient Humidity at anneal (%)",
@@ -184,6 +189,7 @@ PROFILE_PROPERTIES_TO_FIELDNAMES = {
     "sample": "Sample plate directories",
 }
 
+## Models
 
 class Parent_vial(BaseModel):
     date: str
@@ -193,7 +199,6 @@ class Parent_vial(BaseModel):
     salts: list
     total_volume: int
     directory: str
-
 
 class Child(BaseModel):
     barcode: str

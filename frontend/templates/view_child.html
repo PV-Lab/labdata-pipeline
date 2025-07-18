@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
+<h2>View a set of child vials</h2>
 <div>
     Executer: <input class="executer" type="text" value="{{ executer }}" disabled>
 </div>
@@ -27,6 +28,9 @@
 </div>
 <div>
     Ambient humidity (%): <input class="ambient_humidity" type="number" value="{{ ambient_humidity }}">
+</div>
+<div>
+    Saved copy to: <input class="long-input" value="{{ directory }}" disabled>
 </div>
 <div id="message"></div>
 {% endblock %}
