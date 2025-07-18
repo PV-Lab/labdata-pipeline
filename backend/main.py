@@ -243,6 +243,40 @@ def upload_file(local_file_path, dropbox_file_path):
             mode=dropbox.files.WriteMode("overwrite"),
         )
 
+def search_keyword(keyword, parent_folder="/Parent vials"):
+    path = PARENT_PATH + parent_folder
+    options = dropbox.files.SearchOptions(path=path)
+    result = dbx.files_search_v2(query=str(keyword), options=options)
+    return result.matches
+
+
+def download(name, parent_folder="/Parent vials"):
+    """
+    Downloads the file with the given barcode,
+    Returns the data frame and the file path
+    """
+    matches = search_keyword(name, parent_folder)
+    if len(matches) == 0:
+        raise HTTPException(
+            status_code=404, detail=f"Vial with barcode {name} does not exist"
+        )
+    if len(matches) > 1:
+        raise HTTPException(
+            status_code=400, detail=f"There are multiple vials with the barcode {name}"
+        )
+    match = matches[0]
+    path = match.metadata.get_metadata().path_display
+    metadata, response = dbx.files_download(path)
+    csv_data = response.content.decode("utf-8")
+    df = pd.read_csv(StringIO(csv_data), dtype=str)
+    return df, path
+
+def check_if_exists(keyword, parent_folder):
+    """
+    Check if there exists a file with the given keyword in the given folder
+    Return true if it exists
+    """
+    return len(search_keyword(keyword, parent_folder)) != 0
 
 def upload_csv_buffer(csv_buffer, dropbox_file_path):
     """
@@ -441,7 +475,7 @@ def save_parent(parent: Parent_vial):
 @app.post("/create/parent")
 async def create_parent(parent: Parent_vial):
     try:
-        matches = search_parent_barcode(parent.barcode)
+        matches = search_keyword(parent.barcode)
     except Exception as e:
         return {"detail": "Upload failed", "error": e}
     if len(matches) == 1:
@@ -454,7 +488,7 @@ async def create_parent(parent: Parent_vial):
 
 @app.post("/edit/parent")
 async def edit_parent(parent: Parent_vial):
-    matches = search_parent_barcode(parent.barcode)
+    matches = search_keyword(parent.barcode)
     if len(matches) == 0:
         raise HTTPException(
             status_code=404,
@@ -467,35 +501,6 @@ async def edit_parent(parent: Parent_vial):
         )
     print(parent)
     return save_parent(parent)
-
-
-def search_parent_barcode(parent_barcode, parent_folder="/Parent vials"):
-    path = PARENT_PATH + parent_folder
-    options = dropbox.files.SearchOptions(path=path)
-    result = dbx.files_search_v2(query=str(parent_barcode), options=options)
-    return result.matches
-
-
-def download(name, parent_folder="/Parent vials"):
-    """
-    Downloads the file with the given barcode,
-    Returns the data frame and the file path
-    """
-    matches = search_parent_barcode(name, parent_folder)
-    if len(matches) == 0:
-        raise HTTPException(
-            status_code=404, detail=f"Vial with barcode {name} does not exist"
-        )
-    if len(matches) > 1:
-        raise HTTPException(
-            status_code=400, detail=f"There are multiple vials with the barcode {name}"
-        )
-    match = matches[0]
-    path = match.metadata.get_metadata().path_display
-    metadata, response = dbx.files_download(path)
-    csv_data = response.content.decode("utf-8")
-    df = pd.read_csv(StringIO(csv_data), dtype=str)
-    return df, path
 
 
 # Downloads the parent metadata from dropbox
@@ -543,6 +548,8 @@ async def create_child(request: Request):
 
 @app.post("/create/child")
 def save_child(child: Child):
+    if check_if_exists(child.barcode, '/Child vials'):
+        return {'detail': f'Child vial with barcode {child.barcode} already exists'}
     data = [{}]
     for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
         data[0][fieldname] = child.__getattribute__(attribute)
@@ -606,6 +613,8 @@ async def create_plate(request: Request):
 
 @app.post("/plate")
 async def save_plate(plate: Plate):
+    if check_if_exists(plate.barcode, '/Sample plates'):
+        return {'detail': f'Sample plate with barcode {plate.barcode} already exists'}
     data = [
         {},
     ]
@@ -621,7 +630,7 @@ async def save_plate(plate: Plate):
     ## find precursors and copy
     initials = get_initials(plate.executer)
     precursor = plate.precursor
-    child_matches = search_parent_barcode(precursor, '/Child vials')
+    child_matches = search_keyword(precursor, '/Child vials')
     new_plate_folder = plate.directory + f'/{plate.date}-{initials}-{plate.barcode}-{sample_type}'
 
     # Create the folders in the new folders
@@ -642,14 +651,14 @@ async def save_plate(plate: Plate):
         parents = df["Parents"].to_list()
         for parent in parents:
             try:
-                parent_path = search_parent_barcode(parent, '/Parent vials')[0].metadata.get_metadata().path_display
+                parent_path = search_keyword(parent, '/Parent vials')[0].metadata.get_metadata().path_display
                 parent_file_name = parent_path.split('/')[-1]
                 dbx.files_copy_v2(from_path=parent_path, to_path=new_plate_folder + f'/parent-vial-{parent_file_name}')
             except:
                 pass
     elif len(child_matches) == 0:
         try:
-            parent_path = search_parent_barcode(precursor, '/Parent vials')[0].metadata.get_metadata().path_display
+            parent_path = search_keyword(precursor, '/Parent vials')[0].metadata.get_metadata().path_display
             parent_file_name = parent_path.split('/')[-1]
             dbx.files_copy_v2(from_path=parent_path, to_path=new_plate_folder + f'/parent-vial-{parent_file_name}')
         except:
