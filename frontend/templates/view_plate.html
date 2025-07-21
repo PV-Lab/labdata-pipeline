@@ -12,7 +12,12 @@
     Sample plate barcode: <input id="barcode" type="text" value="{{ barcode }}">
 </div>
 <div>
-    Precursor vial barcode: <input id="precursor" type="text" value="{{ precursor }}">
+    Precursor vial barcode:
+    {% if is_child %}
+    <a href="/view/child?barcode={{ precursor }}">{{ precursor }}</a>
+    {% else %}
+    <a href="/parent?parent_barcode={{ precursor }}">{{ precursor }}</a>
+    {% endif %}
 </div>
 </div>
 <hr>

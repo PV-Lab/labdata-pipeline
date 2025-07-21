@@ -705,6 +705,9 @@ def get_plate(request: Request, plate_barcode):
         out[property] = df.iloc[0][fieldname]
     for property, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES['props'].items():
         out['props'][property] = df.iloc[0][fieldname]
+    precursor = out['precursor']
+    is_child = check_if_exists(precursor, '/Child vials')
+    out['is_child'] = is_child
     return templates.TemplateResponse('view_plate.html', {'request': request} | out)
 
 @app.get('/search-plate')
