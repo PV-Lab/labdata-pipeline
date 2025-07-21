@@ -362,16 +362,18 @@ def get_salt(salt_barcode: str):
         chem_form = result["Table"][0]["chemical_formula"]
         molar_mass = ""
         if cas:
-            cid = requests.get(
+            pub_result = requests.get(
                 f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON"
-            ).json()["IdentifierList"]["CID"][0]
-            response = requests.get(
-                f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight,MolecularFormula/JSON"
             ).json()
-            molar_mass = response["PropertyTable"]["Properties"][0]["MolecularWeight"]
-            if not chem_form:
-                chem_form = response["PropertyTable"]["Properties"][0][
-                    "MolecularFormula"
+            if "Fault" not in pub_result:
+                cid = pub_result["IdentifierList"]["CID"][0]
+                response = requests.get(
+                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight,MolecularFormula/JSON"
+                ).json()
+                molar_mass = response["PropertyTable"]["Properties"][0]["MolecularWeight"]
+                if not chem_form:
+                    chem_form = response["PropertyTable"]["Properties"][0][
+                        "MolecularFormula"
                 ]
         return {
             "name": name,

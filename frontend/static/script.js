@@ -95,7 +95,7 @@ function add_salt(event) {
             Molar mass (g/mol): <input class="salt_molar_mass" type="number">
         </div>
          <div>
-            Desired molarity: <input class="salt_desired_molarity" type="text" inputmode="decimal" onkeypress="calculate_mass(event)">
+            Desired molarity (mol/l): <input class="salt_desired_molarity" type="text" inputmode="decimal" oninput="calculate_mass(event)">
         </div>
         <div>
             Mass (g): <input class="salt_mass" type="number">
@@ -331,17 +331,13 @@ function search_salt_barcode(event) {
 function calculate_mass(event) {
     event.preventDefault();
     const target = event.target;
-    if (event.key != 'Enter') {
-        target.value += event.key;
-        const molarity = target.value;
-        const parent_div = target.parentElement.parentElement;
-        const spinner = target.parentElement.querySelector('.spinner');
-        const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
-        const volume = document.querySelector('#volume').value;
-        parent_div.querySelector('.salt_mass').value = molarity * volume * molar_mass/ 1000;
-        parent_div.querySelector('salt_ambient_temp').focus();
-    }
-
+    const molarity = target.value;
+    const parent_div = target.parentElement.parentElement;
+    const spinner = target.parentElement.querySelector('.spinner');
+    const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
+    const volume = document.querySelector('#volume').value;
+    parent_div.querySelector('.salt_mass').value = molarity * volume * molar_mass/ 1000;
+    parent_div.querySelector('salt_ambient_temp').focus();
 }
 
 function search_solvent(event) {
