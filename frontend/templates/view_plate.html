@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Create a sample plate</h2>
+<div id="general">
+<div>
+    Executer: <input value="{{ executer }}" disabled>
+</div>
+<div>
+    Date: <strong><span id="date">{{ date }}</span></strong>
+</div>
+<div>
+    Sample plate barcode: <input id="barcode" type="text" value="{{ barcode }}">
+</div>
+<div>
+    Precursor vial barcode: <input id="precursor" type="text" value="{{ precursor }}">
+</div>
+</div>
+<hr>
+<div id="props">
+<div style="display: flex;">
+    Washed:
+    {% if props['washed'] == 'Yes' %}
+    <label><input type="radio" name="washed" value="Yes" checked disabled>Yes</label>
+    <label><input type="radio" name="washed" value="No" disabled>No</label>
+    {% else %}
+    <label><input type="radio" name="washed" value="Yes" disabled>Yes</label>
+    <label><input type="radio" name="washed" value="No" checked disabled>No</label>
+    {% endif %}
+
+</div>
+<div id="washed" style="padding-left: 20px;">{% if props['washed'] == 'Yes' %}In what: <input type="text" id="washed_in" value="{{props['washed_in'] }}">{%endif%}</div>
+<div style="display: flex;">
+    Ozone treatment:
+    {% if props['ozone'] == 'Yes' %}
+    <label><input type="radio" name="ozone" value="Yes" checked disabled>Yes</label>
+    <label><input type="radio" name="ozone" value="No" disabled>No</label>
+    {% else %}
+    <label><input type="radio" name="ozone" value="Yes" disabled>Yes</label>
+    <label><input type="radio" name="ozone" value="No" checked disabled>No</label>
+    {% endif %}
+</div>
+<div id="ozone" style="padding-left: 20px;">
+    {% if props['ozone'] == 'Yes' %}
+    Time treated (min): <input type="text" id="ozone_time" value="{{props['ozone_time'] }}">
+    {%endif%}
+</div>
+<div style="display: flex;">
+    Sample type:
+    {% if props['sample_type'] == "Dropcast" %}
+    <label><input type="radio" name="sample_type" value="Dropcast" checked disabled>Dropcast</label>
+    <label><input type="radio" name="sample_type" value="Spuncoat" disabled>Spuncoat</label>
+    {% else %}
+    <label><input type="radio" name="sample_type" value="Dropcast" disabled>Dropcast</label>
+    <label><input type="radio" name="sample_type" value="Spuncoat" checked disabled>Spuncoat</label>
+    {%endif%}
+</div>
+<div id="sample_type" style="padding-left: 20px;">
+    {% if props['sample_type'] == "Dropcast" %}
+    <div>
+        <div>
+        Droplet volume (ml): <input type="number" id="dropcast_droplet_volume" value="{{props['dropcast_droplet_volume']}}">
+        </div>
+        <div>
+        Dropcasting temperature (C): <input type="number" id="dropcast_temp" value="{{props['dropcast_temp']}}">
+        </div>
+        <div>
+        Ambient temperature (C): <input type="number" id="dropcast_ambient_temp" value="{{props['dropcast_ambient_temp']}}">
+        </div>
+        <div>
+        Ambient humidity (%): <input type="number" id="dropcast_ambient_humidity" value="{{props['dropcast_ambient_humidity']}}">
+        </div>
+        <div>
+        Drying temperature (C): <input type="number" id="dropcast_drying_temp" value="{{props['dropcast_drying_temp']}}">
+        </div>
+        <div>
+        Drying time (min): <input type="number" id="dropcast_drying_time" value="{{props['dropcast_drying_time']}}">
+        </div>
+    </div>
+    {% else %}
+    <div>
+        <div>Droplet volume (ml): <input type="number" id="spuncoat_droplet_volume" value="{{props['spuncoat_droplet_volume']}}"></div>
+        <div>Spin speed (RPM): <input type="number" id="spuncoat_spin_speed" value="{{props['spuncoat_spin_speed']}}"></div>
+        <div>Spin acceleration: <input type="number" id="spuncoat_spin_acceleration" value="{{props['spuncoat_spin_acceleration']}}"></div>
+        <div>Spin time (min): <input type="number" id="spuncoat_spin_time" value="{{props['spuncoat_spin_time']}}"></div>
+        <div>Ambient temperature (C): <input type="number" id="spuncoat_ambient_temp" value="{{props['spuncoat_ambient_temp']}}"></div>
+        <div>Ambient humidity (%): <input type="number" id="spuncoat_ambient_humidity" value="{{props['spuncoat_ambient_humidity']}}"></div>
+    </div>
+    {%endif%}
+</div>
+<div>Annealing</div>
+<div style="padding-left: 20px;">
+    <div>
+        Annealing temperature (C): <input type="number" id="annealing_temp" value="{{ props['annealing_temp'] }}">
+    </div>
+    <div>
+        Annealing time (min): <input type="number" id="annealing_time" value="{{ props['annealing_time'] }}">
+    </div>
+    <div>
+        Ambient temperature (C): <input type="number" id="anneal_ambient_temp" value="{{ props['anneal_ambient_temp'] }}">
+    </div>
+    <div>
+        Ambient humidity (%): <input type="number" id="anneal_ambient_humidity" value="{{ props['anneal_ambient_humidity'] }}">
+    </div>
+</div>
+<hr>
+<div>
+    Notes: <textarea id="notes">{{ notes }}</textarea>
+</div>
+<div>
+    Saved copy to: <input class="long-input" value="{{ directory }}">
+</div>
+{% endblock %}

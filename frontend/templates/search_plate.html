@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Search sample plate</h2>
+Enter plate barcode here:
+<form action="/plate">
+    <input type="text" name="plate_barcode">
+    <input type="submit">
+{% endblock %}

@@ -435,6 +435,7 @@ function save_plate() {
     plate.executer = document.querySelector('#executer').value;
     plate.date = general.querySelector('#date').innerHTML;
     plate.directory = document.querySelector('#directory').value;
+    plate.notes = document.querySelector('#notes').value;
     props.forEach(input => {
         if (input.type === 'radio' ) {
             if (input.checked) {

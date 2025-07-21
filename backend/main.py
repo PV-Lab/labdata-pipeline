@@ -139,6 +139,7 @@ PLATE_FIELDNAMES = [
     "Annealing time (min)",
     "Ambient temp at anneal (C)",
     "Ambient Humidity at anneal (%)",
+    "Notes",
     "Save copy to"
 ]
 
@@ -148,7 +149,8 @@ PLATE_PROPERTIES_TO_FIELDNAMES = {
         "barcode": "Sample plate barcode",
         "executer": "Executer",
         "precursor": "Precursor vial barcode",
-        'directory': 'Save copy to'
+        'directory': 'Save copy to',
+        'notes': "Notes"
     },
     "props": {
         "anneal_ambient_humidity": "Ambient Humidity at anneal (%)",
@@ -217,6 +219,7 @@ class Plate(BaseModel):
     precursor: str
     props: dict
     directory: str
+    notes: str
 
 
 class Profile(BaseModel):
@@ -681,6 +684,26 @@ async def save_plate(plate: Plate):
     except Exception as e:
         return {"detail": "Upload failed", "error": e}
 
+@app.get('/plate')
+def get_plate(request: Request, plate_barcode):
+    """
+    Downloads the information related to a sample plate
+    """
+    df, path = download(plate_barcode, "/Sample plates")
+    out = {}
+    out['props'] = {}
+    for property, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES['general'].items():
+        out[property] = df.iloc[0][fieldname]
+    for property, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES['props'].items():
+        out['props'][property] = df.iloc[0][fieldname]
+    return templates.TemplateResponse('view_plate.html', {'request': request} | out)
+
+@app.get('/search-plate')
+def search_plate(request: Request):
+    """
+    Returns the page which allows to search the plate barcode
+    """
+    return templates.TemplateResponse('search_plate.html', {'request': request})
 
 ### Profiles ####
 #################
