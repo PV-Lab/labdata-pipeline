@@ -1,3 +1,4 @@
+import urllib.parse
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -13,6 +14,7 @@ import pandas as pd
 from io import StringIO
 import numpy as np
 import requests
+import urllib
 
 
 ## get API keys
@@ -365,6 +367,11 @@ def get_salt(salt_barcode: str):
             pub_result = requests.get(
                 f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON"
             ).json()
+            if "Fault" in pub_result and name != '':
+                encoded_name = urllib.parse.quote(name.lower())
+                pub_result = requests.get(
+                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/cids/JSON"
+                ).json()
             if "Fault" not in pub_result:
                 cid = pub_result["IdentifierList"]["CID"][0]
                 response = requests.get(
