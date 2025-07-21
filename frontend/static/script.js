@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (radio.value === 'Dropcast') {
                         document.querySelector('#sample_type').innerHTML = `<div>
                         <div>
-                        Droplet volume (ml): <input type="number" id="dropcast_droplet_volume">
+                        Droplet volume (μl): <input type="number" id="dropcast_droplet_volume">
                         </div>
                         <div>
                         Dropcasting temperature (C): <input type="number" id="dropcast_temp">
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     } else {
                         document.querySelector('#sample_type').innerHTML = `
                         <div>
-                        <div>Droplet volume (ml): <input type="number" id="spuncoat_droplet_volume"></div>
+                        <div>Droplet volume (μl): <input type="number" id="spuncoat_droplet_volume"></div>
                         <div>Spin speed (RPM): <input type="number" id="spuncoat_spin_speed"></div>
                         <div>Spin acceleration: <input type="number" id="spuncoat_spin_acceleration"></div>
                         <div>Spin time (min): <input type="number" id="spuncoat_spin_time"></div>
