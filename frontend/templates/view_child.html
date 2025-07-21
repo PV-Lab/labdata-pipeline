@@ -16,7 +16,7 @@
         {% for parent in parents %}
         <div id="parents">
             <div>
-                Parent barcode: <input class="parent" type="text" value="{{ parent }}" disabled>
+                Parent barcode: <a href="/parent?parent_barcode={{ parent }}">{{ parent }}</a>
             </div>
         </div>
         {% endfor %}
