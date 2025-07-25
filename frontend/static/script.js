@@ -366,46 +366,77 @@ function search_solvent(event) {
     }
 }
 
+function check_child(object) {
+    for (const key in object) {
+        if (key != 'parents') {
+            if (object[key] === '') {
+                return {
+                    'status': false,
+                    'empty': key,
+                };
+            };
+        };
+    };
+    if (object.parents.length === 0) {
+        return {
+            'status': false,
+            'empty': 'parent barcode'
+        };
+    };
+    return {'status': true}
+}
 
-function save_child() {
-    const message_div = document.querySelector('#message');
-    const spinner = message_div.parentElement.querySelector('.spinner');
-    spinner.style.display = 'inline-block';
+function create_child() {
     let child = {};
     child.parents = [];
     child.executer = document.querySelector('#executer').value;
     child.date = document.querySelector('#date').innerHTML;
     child.directory = document.querySelector('#directory').value;
-    console.log(child);
     const inputs = document.querySelectorAll('input');
     inputs.forEach(input => {
         if (input.className === 'parent') {
-            child['parents'].push(input.value);
+            if (input.value != '') {
+                child['parents'].push(input.value);
+            }
         } else {
             child[input.id] = input.value;
         }
     });
-    console.log(child);
-    fetch('/create/child', {
-        'method': 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(child)
-    })
-    .then((response) => response.json())
-    .then((data) => {
-        console.log(data);
-        if (data.detail === 'Uploaded successfully') {
-            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
-        } else {
-            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
-        }
-        spinner.style.display = 'none';
-    })
-    .catch((error) => {
-        console.log('Error', error)
-    })
+    return child;
+}
+
+function save_child() {
+    const message_div = document.querySelector('#message');
+    const spinner = message_div.parentElement.querySelector('.spinner');
+    const child = create_child();
+    check = check_child(child);
+    console.log(check);
+    if (check['status']) {
+        spinner.style.display = 'inline-block';
+        fetch('/create/child', {
+            'method': 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(child)
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            console.log(data);
+            if (data.detail === 'Uploaded successfully') {
+                message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+            } else {
+                message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+            }
+            spinner.style.display = 'none';
+        })
+        .catch((error) => {
+            console.log('Error', error)
+        })
+    } else {
+        message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+    }
+
 }
 
 function add_parent(event) {
