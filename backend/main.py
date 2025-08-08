@@ -26,20 +26,292 @@ CHEMICALS_API_KEY = os.getenv("CHEMICALS_API_KEY")
 
 PARENT_PATH = "/Buonassisi-Group/Projects - Active/Chemical Tracing"
 
+### Load the dropbox account
 dbx = dropbox.Dropbox(
     app_key=DROPBOX_APP_KEY,
     app_secret=DROPBOX_APP_SECRET,
     oauth2_refresh_token=DROPBOX_REFRESH_TOKEN,
 )
-
 account = dbx.users_get_current_account()
 team_namespace_id = account.root_info.root_namespace_id
 dbx = dbx.with_path_root(dropbox.common.PathRoot.namespace_id(team_namespace_id))
 
+## create the app
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 templates = Jinja2Templates(directory="frontend/templates")
 
+PROFILE_FIELDNAMES = [
+    "Name",
+    "Parent vial directories",
+    "Child vial directories",
+    "Sample plate directories",
+]
+
+PROFILE_PROPERTIES_TO_FIELDNAMES = {
+    "name": "Name",
+    "parent": "Parent vial directories",
+    "child": "Child vial directories",
+    "sample": "Sample plate directories",
+}
+
+## Models
+
+
+class ParentVial(BaseModel):
+    """
+    model for the parent vial JSON input
+    """
+    date: str
+    executer: str
+    barcode: str
+    solvents: list
+    salts: list
+    total_volume: int
+    directory: str
+
+
+class Child(BaseModel):
+    """
+    model for the Child vial JSON input
+    """
+    barcode: str
+    executer: str
+    date: str
+    parents: list
+    ambient_temp: float
+    ambient_humidity: float
+    directory: str
+
+
+class Plate(BaseModel):
+    """
+    Model for the Plate JSON input
+    """
+    executer: str
+    date: str
+    barcode: str
+    precursor: str
+    props: dict
+    directory: str
+    notes: str
+
+
+class Profile(BaseModel):
+    """
+    Model for the profile JSON input
+    """
+    name: str
+    parent: list
+    child: list
+    sample: list
+
+
+#### Dropbox helper functions ###
+def get_initials(full_name):
+    """
+    Returns the initials of a name
+    """
+    return ".".join([name[0] for name in full_name.split(" ")])
+
+
+def upload_file(local_file_path, dropbox_file_path):
+    """
+    Uploads local file to the given dropbox file path
+    """
+    with open(local_file_path, "rb") as f:
+        dbx.files_upload(
+            f.read(),
+            PARENT_PATH + dropbox_file_path,
+            mode=dropbox.files.WriteMode("overwrite"),
+        )
+
+
+def search_keyword(keyword, parent_folder="/Parent vials"):
+    """
+    Returns all matches to the given keyword in the given parent forlder
+    """
+    path = PARENT_PATH + parent_folder
+    options = dropbox.files.SearchOptions(path=path)
+    result = dbx.files_search_v2(query=str(keyword), options=options)
+    return result.matches
+
+
+def download(name, parent_folder="/Parent vials"):
+    """
+    Downloads the file with the given barcode,
+    Returns the data frame and the file path
+    """
+    matches = search_keyword(name, parent_folder)
+    if len(matches) == 0:
+        raise HTTPException(
+            status_code=404, detail=f"Vial with barcode {name} does not exist"
+        )
+    if len(matches) > 1:
+        raise HTTPException(
+            status_code=400, detail=f"There are multiple vials with the barcode {name}"
+        )
+    match = matches[0]
+    path = match.metadata.get_metadata().path_display
+    metadata, response = dbx.files_download(path)
+    csv_data = response.content.decode("utf-8")
+    df = pd.read_csv(StringIO(csv_data), dtype=str)
+    return df, path
+
+
+def check_if_exists(keyword, parent_folder):
+    """
+    Check if there exists a file with the given keyword in the given folder
+    Return true if it exists
+    """
+    return len(search_keyword(keyword, parent_folder)) != 0
+
+
+def upload_csv_buffer(csv_buffer, dropbox_file_path):
+    """
+    Uploads a csv buffer to the given dropbox file path + the parent path
+    """
+    return dbx.files_upload(
+        csv_buffer.getvalue().encode("utf-8"),
+        PARENT_PATH + dropbox_file_path,
+        mode=dropbox.files.WriteMode("overwrite"),
+    )
+
+
+def upload_csv_buffer_to_path(csv_buffer, dropbox_file_path):
+    """
+    Uploads a csv buffer to the given dropbox file path + the parent path
+    """
+    return dbx.files_upload(
+        csv_buffer.getvalue().encode("utf-8"),
+        dropbox_file_path,
+        mode=dropbox.files.WriteMode("overwrite"),
+    )
+
+
+def delete_file(file_path):
+    """
+    Deletes a files at the given dropbox file path
+    """
+    dbx.files_delete_v2(file_path)
+
+
+def all_file_names(directory):
+    """
+    Returns all file names in the given directory sorted in alphabetical order
+    """
+    path = PARENT_PATH + directory
+    entries = []
+    try:
+        result = dbx.files_list_folder(path)
+        entries.extend(result.entries)
+
+        while result.has_more:
+            result = dbx.files_list_folder_continue(result.cursor)
+            entries.extend(result.entries)
+
+        file_names = [
+            entry.name[:-4]
+            for entry in entries
+            if isinstance(entry, dropbox.files.FileMetadata)
+        ]
+        return sorted(file_names)
+
+    except dropbox.exceptions.ApiError as err:
+        print("API error:", err)
+        return []
+
+
+### Salt and solvent API endpoints ###
+@app.get("/salt/{salt_barcode}")
+def get_salt(salt_barcode: str):
+    """
+    Returns information about a salt from the EHS inventory and the pubchem database
+    """
+    params = {"AuthKey": CHEMICALS_API_KEY, "barcode": salt_barcode}
+    try:
+        response = requests.get(
+            "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
+            params=params, timeout=5
+        )
+    except requests.exceptions.Timeout:
+        HTTPException(status_code=400, detail="Request time out")
+    try:
+        result = response.json()
+        cas = result["Table"][0]["cas_num"]
+        name = result["Table"][0]["chemical_description"]
+        chem_form = result["Table"][0]["chemical_formula"]
+        molar_mass = ""
+        if cas:
+            pub_result = requests.get(
+                f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON"
+            ).json()
+            if "Fault" in pub_result and name != "":
+                encoded_name = urllib.parse.quote(name.lower())
+                pub_result = requests.get(
+                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/\
+                        name/{encoded_name}/cids/JSON"
+                ).json()
+            if "Fault" not in pub_result:
+                cid = pub_result["IdentifierList"]["CID"][0]
+                response = requests.get(
+                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/\
+                        cid/{cid}/attribute/MolecularWeight,MolecularFormula/JSON"
+                ).json()
+                molar_mass = response["PropertyTable"]["Properties"][0][
+                    "MolecularWeight"
+                ]
+                if not chem_form:
+                    chem_form = response["PropertyTable"]["Properties"][0][
+                        "MolecularFormula"
+                    ]
+        return {
+            "name": name,
+            "chem_form": chem_form,
+            "molar_mass": molar_mass,
+            "receipt_date": result["Table"][0]["receipt_date"][:10],
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Salt barcode not found")
+
+
+@app.get("/solvent/{solvent_barcode}")
+def get_solvent(solvent_barcode: str):
+    """
+    Returns the solvent information from the EHS database
+    """
+    params = {"AuthKey": CHEMICALS_API_KEY, "barcode": solvent_barcode}
+    response = requests.get(
+        "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
+        params=params,
+    )
+    try:
+        result = response.json()
+        return {
+            "name": result["Table"][0]["chemical_description"],
+            "concentration": result["Table"][0]["concentration"],
+            "receipt_date": result["Table"][0]["receipt_date"][:10],
+        }
+    except:
+        raise HTTPException(status_code=400, detail="Solvent barcode not found")
+
+
+### Homepage ####
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    """
+    Renders the homepage
+    """
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+#### Parent vials #####
+#######################
+
+### Fieldnames for generated csv files and the respective properties for parent vial
 FIELDNAMES = [
     "Date",
     "Executer",
@@ -96,6 +368,149 @@ PROPERTIES_TO_FIELDMAMES = {
     },
 }
 
+
+@app.get("/create/parent", response_class=HTMLResponse)
+async def create_new_parent(request: Request):
+    """
+    Renders the page which allows the user to enter the parent vial metadata
+    """
+    return templates.TemplateResponse(
+        "create_parent.html",
+        {
+            "request": request,
+            "date": datetime.now().date(),
+            "profiles": list_all_profiles(),
+        },
+    )
+
+
+@app.get("/search/parent", response_class=HTMLResponse)
+async def search_parent(request: Request):
+    """
+    Renders the page which allows the user to search for the parent using barcode
+    """
+    return templates.TemplateResponse("search_parent.html", {"request": request})
+
+
+# Creates and uploads the parent metadata to dropbox
+def save_parent(parent: ParentVial):
+    """
+    Saves the given parent vial metadata to dropbox
+    """
+    data = [
+        {},
+    ]
+
+    # for each general attribute, add the data to the fieldname
+    for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["general"].items():
+        data[0][fieldname] = parent.__getattribute__(attribute)
+
+    # for each salt attribute, add the data to the fieldname
+    for i, salt in enumerate(parent.salts):
+        if i > len(data) - 1:
+            data.append({})
+        row = data[i]
+        for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["salts"].items():
+            row[fieldname] = salt[attribute]
+
+    # for each solvent attribute, add the data to the fieldname
+    for i, solvent in enumerate(parent.solvents):
+        if i > len(data) - 1:
+            data.append({})
+        row = data[i]
+        for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["solvents"].items():
+            row[fieldname] = solvent[attribute]
+
+    csv_buffer = StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(data)
+    csv_buffer.seek(0)
+
+    try:
+        upload_csv_buffer(
+            csv_buffer, f'/Parent vials/{data[0]["Date"]}_{parent.barcode}.csv'
+        )
+        upload_csv_buffer_to_path(
+            csv_buffer, f'{parent.directory}/{data[0]["Date"]}_{parent.barcode}.csv'
+        )
+        return {"detail": "Uploaded successfully"}
+    except Exception as e:
+        return {"detail": "Upload failed", "error": e}
+
+
+@app.post("/create/parent")
+async def create_parent(parent: ParentVial):
+    """
+    Creates a new parent vial and saves the metadata to dropbox
+    """
+    try:
+        matches = search_keyword(parent.barcode)
+    except Exception as e:
+        return {"detail": "Upload failed", "error": e}
+    if len(matches) == 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"There exists a vial with this barcode {parent.barcode}",
+        )
+    return save_parent(parent)
+
+
+@app.post("/edit/parent")
+async def edit_parent(parent: ParentVial):
+    """
+    Edits the given parent vial metadata and save the information to dropbox
+    """
+    matches = search_keyword(parent.barcode)
+    if len(matches) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"parent vial with barcode {parent.barcode} does not exist",
+        )
+    if len(matches) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"There are multiple vials with the barcode {parent.barcode}",
+        )
+    print(parent)
+    return save_parent(parent)
+
+
+# Downloads the parent metadata from dropbox
+@app.get("/parent", response_class=HTMLResponse)
+async def get_parent(request: Request, parent_barcode: str):
+    """
+    Renders the page which allows the user to edit and view parent vial information
+    """
+    df, path = download(parent_barcode)
+    output = {}
+    salts = []
+    solvents = []
+    for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["general"].items():
+        output[attribute] = df.iloc[0][fieldname]
+    no_salts = df["Salt name"].count()
+    for i in range(no_salts):
+        salt = {}
+        for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["salts"].items():
+            salt[attribute] = df.iloc[i][fieldname]
+        salts.append(salt)
+    no_solvents = df["Name of the solvent"].count()
+    for i in range(no_solvents):
+        solvent = {}
+        for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["solvents"].items():
+            solvent[attribute] = df.iloc[i][fieldname]
+        solvents.append(solvent)
+
+    output["salts"] = salts
+    output["solvents"] = solvents
+    return templates.TemplateResponse("edit_vial.html", {"request": request} | output)
+
+
+#### Child vials #####
+######################
+
+## Fieldnames for generated csv and respective JS
+
 CHILD_FIELDNAMES = [
     "Date",
     "Executer",
@@ -103,7 +518,7 @@ CHILD_FIELDNAMES = [
     "Parents",
     "Ambient temperature (C)",
     "Ambient humidity (%)",
-    'Save copy to'
+    "Save copy to",
 ]
 
 CHILD_PROPERTIES_TO_FIELDNAMES = {
@@ -112,8 +527,89 @@ CHILD_PROPERTIES_TO_FIELDNAMES = {
     "barcode": "Barcode on holder",
     "ambient_temp": "Ambient temperature (C)",
     "ambient_humidity": "Ambient humidity (%)",
-    'directory': 'Save copy to'
+    "directory": "Save copy to",
 }
+
+
+@app.get("/create/child", response_class=HTMLResponse)
+async def create_child(request: Request):
+    """
+    Renders the page which allows the user to enter the child vial metadata
+    """
+    return templates.TemplateResponse(
+        "create_child.html",
+        {
+            "request": request,
+            "date": datetime.now().date(),
+            "profiles": list_all_profiles(),
+        },
+    )
+
+
+@app.post("/create/child")
+def save_child(child: Child):
+    """
+    Uploads the child metadata to dropbox
+    """
+    if check_if_exists(child.barcode, "/Child vials"):
+        return {"detail": f"Child vial with barcode {child.barcode} already exists"}
+    data = [{}]
+    for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
+        data[0][fieldname] = child.__getattribute__(attribute)
+
+    for i, parent in enumerate(child.parents):
+        if i > len(data) - 1:
+            data.append({})
+        data[i]["Parents"] = parent
+
+    csv_buffer = StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=CHILD_FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(data)
+    csv_buffer.seek(0)
+
+    try:
+        upload_csv_buffer(
+            csv_buffer, f'/Child vials/{data[0]["Date"]}_{child.barcode}.csv'
+        )
+        upload_csv_buffer_to_path(
+            csv_buffer, f'{child.directory}/{data[0]["Date"]}_{child.barcode}'
+        )
+        return {"detail": "Uploaded successfully"}
+    except Exception as e:
+        return {"detail": "Upload failed", "error": e}
+
+
+@app.get("/search/child", response_class=HTMLResponse)
+async def search_child(request: Request):
+    """
+    Renders the plate which allows the user to search the child vial metadata by child
+    vial barcode
+    """
+    return templates.TemplateResponse("search_child.html", {"request": request})
+
+
+@app.get("/view/child", response_class=HTMLResponse)
+async def get_child(request: Request, barcode: str):
+    """
+    Renders the page which allows the user to view the child vial metadata
+    given the barcode
+    """
+    df, path = download(barcode, "/Child vials")
+    output = {}
+    output["parents"] = []
+    for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
+        output[attribute] = df.iloc[0][fieldname]
+    no_parents = df["Parents"].count()
+    for i in range(no_parents):
+        output["parents"].append(df.iloc[i]["Parents"])
+    return templates.TemplateResponse("view_child.html", {"request": request} | output)
+
+
+#### Sample plates #####
+########################
+
+### fieldnames for csv and the respective
 
 PLATE_FIELDNAMES = [
     "Date",
@@ -142,7 +638,7 @@ PLATE_FIELDNAMES = [
     "Ambient temp at anneal (C)",
     "Ambient Humidity at anneal (%)",
     "Notes",
-    "Save copy to"
+    "Save copy to",
 ]
 
 PLATE_PROPERTIES_TO_FIELDNAMES = {
@@ -151,8 +647,8 @@ PLATE_PROPERTIES_TO_FIELDNAMES = {
         "barcode": "Sample plate barcode",
         "executer": "Executer",
         "precursor": "Precursor vial barcode",
-        'directory': 'Save copy to',
-        'notes': "Notes"
+        "directory": "Save copy to",
+        "notes": "Notes",
     },
     "props": {
         "anneal_ambient_humidity": "Ambient Humidity at anneal (%)",
@@ -179,440 +675,12 @@ PLATE_PROPERTIES_TO_FIELDNAMES = {
     },
 }
 
-PROFILE_FIELDNAMES = [
-    "Name",
-    "Parent vial directories",
-    "Child vial directories",
-    "Sample plate directories",
-]
 
-PROFILE_PROPERTIES_TO_FIELDNAMES = {
-    "name": "Name",
-    "parent": "Parent vial directories",
-    "child": "Child vial directories",
-    "sample": "Sample plate directories",
-}
-
-## Models
-
-class Parent_vial(BaseModel):
-    date: str
-    executer: str
-    barcode: str
-    solvents: list
-    salts: list
-    total_volume: int
-    directory: str
-
-class Child(BaseModel):
-    barcode: str
-    executer: str
-    date: str
-    parents: list
-    ambient_temp: float
-    ambient_humidity: float
-    directory: str
-
-
-class Plate(BaseModel):
-    executer: str
-    date: str
-    barcode: str
-    precursor: str
-    props: dict
-    directory: str
-    notes: str
-
-
-class Profile(BaseModel):
-    name: str
-    parent: list
-    child: list
-    sample: list
-
-
-#### Dropbox helper functions ###
-def get_initials(full_name):
-    """
-    Returns the initials of a name
-    """
-    return '.'.join([name[0] for name in full_name.split(' ')])
-def upload_file(local_file_path, dropbox_file_path):
-    """
-    Uploads local file to the given dropbox file path
-    """
-    with open(local_file_path, "rb") as f:
-        dbx.files_upload(
-            f.read(),
-            PARENT_PATH + dropbox_file_path,
-            mode=dropbox.files.WriteMode("overwrite"),
-        )
-
-def search_keyword(keyword, parent_folder="/Parent vials"):
-    path = PARENT_PATH + parent_folder
-    options = dropbox.files.SearchOptions(path=path)
-    result = dbx.files_search_v2(query=str(keyword), options=options)
-    return result.matches
-
-
-def download(name, parent_folder="/Parent vials"):
-    """
-    Downloads the file with the given barcode,
-    Returns the data frame and the file path
-    """
-    matches = search_keyword(name, parent_folder)
-    if len(matches) == 0:
-        raise HTTPException(
-            status_code=404, detail=f"Vial with barcode {name} does not exist"
-        )
-    if len(matches) > 1:
-        raise HTTPException(
-            status_code=400, detail=f"There are multiple vials with the barcode {name}"
-        )
-    match = matches[0]
-    path = match.metadata.get_metadata().path_display
-    metadata, response = dbx.files_download(path)
-    csv_data = response.content.decode("utf-8")
-    df = pd.read_csv(StringIO(csv_data), dtype=str)
-    return df, path
-
-def check_if_exists(keyword, parent_folder):
-    """
-    Check if there exists a file with the given keyword in the given folder
-    Return true if it exists
-    """
-    return len(search_keyword(keyword, parent_folder)) != 0
-
-def upload_csv_buffer(csv_buffer, dropbox_file_path):
-    """
-    Uploads a csv buffer to the given dropbox file path + the parent path
-    """
-    return dbx.files_upload(
-        csv_buffer.getvalue().encode("utf-8"),
-        PARENT_PATH + dropbox_file_path,
-        mode=dropbox.files.WriteMode("overwrite"),
-    )
-
-def upload_csv_buffer_to_path(csv_buffer, dropbox_file_path):
-    """
-    Uploads a csv buffer to the given dropbox file path + the parent path
-    """
-    return dbx.files_upload(
-        csv_buffer.getvalue().encode("utf-8"),
-        dropbox_file_path,
-        mode=dropbox.files.WriteMode("overwrite"),
-    )
-
-
-
-def delete_file(file_path):
-    """
-    Deletes a files at the given dropbox file path
-    """
-    dbx.files_delete_v2(file_path)
-
-
-def change_to_native_types(object):
-    if isinstance(object, np.int_):
-        return int(object)
-    if isinstance(object, np.float64):
-        return float(object)
-    return object
-
-
-def all_file_names(directory):
-    """
-    Returns all file names in the given directory sorted in alphabetical order
-    """
-    path = PARENT_PATH + directory
-    entries = []
-    try:
-        result = dbx.files_list_folder(path)
-        entries.extend(result.entries)
-
-        while result.has_more:
-            result = dbx.files_list_folder_continue(result.cursor)
-            entries.extend(result.entries)
-
-        file_names = [
-            entry.name[:-4]
-            for entry in entries
-            if isinstance(entry, dropbox.files.FileMetadata)
-        ]
-        return sorted(file_names)
-
-    except dropbox.exceptions.ApiError as err:
-        print("API error:", err)
-        return []
-
-
-### API endpoints ###
-@app.get("/get_salt/{salt_barcode}")
-def get_salt(salt_barcode: str):
-    """
-    Returns information about a salt
-    """
-    params = {"AuthKey": CHEMICALS_API_KEY, "barcode": salt_barcode}
-    response = requests.get(
-        "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
-        params=params,
-    )
-    try:
-        result = response.json()
-        cas = result["Table"][0]["cas_num"]
-        name = result["Table"][0]["chemical_description"]
-        chem_form = result["Table"][0]["chemical_formula"]
-        molar_mass = ""
-        if cas:
-            pub_result = requests.get(
-                f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON"
-            ).json()
-            if "Fault" in pub_result and name != '':
-                encoded_name = urllib.parse.quote(name.lower())
-                pub_result = requests.get(
-                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/cids/JSON"
-                ).json()
-            if "Fault" not in pub_result:
-                cid = pub_result["IdentifierList"]["CID"][0]
-                response = requests.get(
-                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight,MolecularFormula/JSON"
-                ).json()
-                molar_mass = response["PropertyTable"]["Properties"][0]["MolecularWeight"]
-                if not chem_form:
-                    chem_form = response["PropertyTable"]["Properties"][0][
-                        "MolecularFormula"
-                ]
-        return {
-            "name": name,
-            "chem_form": chem_form,
-            "molar_mass": molar_mass,
-            "receipt_date": result["Table"][0]["receipt_date"][:10],
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Salt barcode not found")
-
-
-@app.get("/get_solvent/{solvent_barcode}")
-def get_solvent(solvent_barcode: str):
-    params = {"AuthKey": CHEMICALS_API_KEY, "barcode": solvent_barcode}
-    response = requests.get(
-        "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
-        params=params,
-    )
-    try:
-        result = response.json()
-        return {
-            "name": result["Table"][0]["chemical_description"],
-            "concentration": result["Table"][0]["concentration"],
-            "receipt_date": result["Table"][0]["receipt_date"][:10],
-        }
-    except:
-        raise HTTPException(status_code=400, detail="Solvent barcode not found")
-
-
-### Homepage ####
-
-
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-
-#### Parent vials #####
-#######################
-
-
-@app.get("/create", response_class=HTMLResponse)
-async def create(request: Request):
-    return templates.TemplateResponse(
-        "create_new.html",
-        {
-            "request": request,
-            "date": datetime.now().date(),
-            "profiles": list_all_profiles(),
-        },
-    )
-
-
-@app.get("/edit", response_class=HTMLResponse)
-async def edit(request: Request):
-    return templates.TemplateResponse("edit.html", {"request": request})
-
-
-# Creates and uploads the parent metadata to dropbox
-def save_parent(parent: Parent_vial):
-    data = [
-        {},
-    ]
-
-    # for each general attribute, add the data to the fieldname
-    for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["general"].items():
-        data[0][fieldname] = parent.__getattribute__(attribute)
-
-    # for each salt attribute, add the data to the fieldname
-    for i, salt in enumerate(parent.salts):
-        if i > len(data) - 1:
-            data.append({})
-        row = data[i]
-        for property, fieldname in PROPERTIES_TO_FIELDMAMES["salts"].items():
-            row[fieldname] = salt[property]
-
-    # for each solvent attribute, add the data to the fieldname
-    for i, solvent in enumerate(parent.solvents):
-        if i > len(data) - 1:
-            data.append({})
-        row = data[i]
-        for property, fieldname in PROPERTIES_TO_FIELDMAMES["solvents"].items():
-            row[fieldname] = solvent[property]
-
-    csv_buffer = StringIO()
-    writer = csv.DictWriter(csv_buffer, fieldnames=FIELDNAMES)
-    writer.writeheader()
-    writer.writerows(data)
-    csv_buffer.seek(0)
-
-    try:
-        upload_csv_buffer(
-            csv_buffer, f'/Parent vials/{data[0]["Date"]}_{parent.barcode}.csv'
-        )
-        upload_csv_buffer_to_path(
-            csv_buffer, f'{parent.directory}/{data[0]["Date"]}_{parent.barcode}.csv'
-        )
-        return {"detail": "Uploaded successfully"}
-    except Exception as e:
-        return {"detail": "Upload failed", "error": e}
-
-
-@app.post("/create/parent")
-async def create_parent(parent: Parent_vial):
-    try:
-        matches = search_keyword(parent.barcode)
-    except Exception as e:
-        return {"detail": "Upload failed", "error": e}
-    if len(matches) == 1:
-        raise HTTPException(
-            status_code=400,
-            detail=f"There exists a vial with this barcode {parent.barcode}",
-        )
-    return save_parent(parent)
-
-
-@app.post("/edit/parent")
-async def edit_parent(parent: Parent_vial):
-    matches = search_keyword(parent.barcode)
-    if len(matches) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f"parent vial with barcode {parent.barcode} does not exist",
-        )
-    if len(matches) > 1:
-        raise HTTPException(
-            status_code=400,
-            detail=f"There are multiple vials with the barcode {parent.barcode}",
-        )
-    print(parent)
-    return save_parent(parent)
-
-
-# Downloads the parent metadata from dropbox
-@app.get("/parent", response_class=HTMLResponse)
-async def get_parent(request: Request, parent_barcode: str):
-    df, path = download(parent_barcode)
-    output = {}
-    salts = []
-    solvents = []
-    for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["general"].items():
-        output[attribute] = df.iloc[0][fieldname]
-    no_salts = df["Salt name"].count()
-    for i in range(no_salts):
-        salt = {}
-        for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["salts"].items():
-            salt[attribute] = df.iloc[i][fieldname]
-        salts.append(salt)
-    no_solvents = df["Name of the solvent"].count()
-    for i in range(no_solvents):
-        solvent = {}
-        for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["solvents"].items():
-            solvent[attribute] = df.iloc[i][fieldname]
-        solvents.append(solvent)
-
-    output["salts"] = salts
-    output["solvents"] = solvents
-    return templates.TemplateResponse("edit_vial.html", {"request": request} | output)
-
-
-#### Child vials #####
-######################
-
-
-@app.get("/create-child", response_class=HTMLResponse)
-async def create_child(request: Request):
-    return templates.TemplateResponse(
-        "create_child.html",
-        {
-            "request": request,
-            "date": datetime.now().date(),
-            "profiles": list_all_profiles(),
-        },
-    )
-
-
-@app.post("/create/child")
-def save_child(child: Child):
-    if check_if_exists(child.barcode, '/Child vials'):
-        return {'detail': f'Child vial with barcode {child.barcode} already exists'}
-    data = [{}]
-    for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
-        data[0][fieldname] = child.__getattribute__(attribute)
-
-    for i, parent in enumerate(child.parents):
-        if i > len(data) - 1:
-            data.append({})
-        data[i]["Parents"] = parent
-
-    csv_buffer = StringIO()
-    writer = csv.DictWriter(csv_buffer, fieldnames=CHILD_FIELDNAMES)
-    writer.writeheader()
-    writer.writerows(data)
-    csv_buffer.seek(0)
-
-    try:
-        upload_csv_buffer(
-            csv_buffer, f'/Child vials/{data[0]["Date"]}_{child.barcode}.csv'
-        )
-        upload_csv_buffer_to_path(
-            csv_buffer, f'{child.directory}/{data[0]["Date"]}_{child.barcode}'
-        )
-        return {"detail": "Uploaded successfully"}
-    except Exception as e:
-        return {"detail": "Upload failed", "error": e}
-
-
-@app.get("/view/child", response_class=HTMLResponse)
-async def get_child(request: Request, barcode: str):
-    df, path = download(barcode, "/Child vials")
-    output = {}
-    output["parents"] = []
-    for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
-        output[attribute] = df.iloc[0][fieldname]
-    no_parents = df["Parents"].count()
-    for i in range(no_parents):
-        output["parents"].append(df.iloc[i]["Parents"])
-    return templates.TemplateResponse("view_child.html", {"request": request} | output)
-
-
-@app.get("/search/child", response_class=HTMLResponse)
-async def search_child(request: Request):
-    return templates.TemplateResponse("search_child.html", {"request": request})
-
-
-#### Sample plates #####
-########################
-
-
-@app.get("/create-plate", response_class=HTMLResponse)
+@app.get("/create/plate", response_class=HTMLResponse)
 async def create_plate(request: Request):
+    """
+    Renders the page which allows the user to enter the sample plate metadata
+    """
     return templates.TemplateResponse(
         "create_plate.html",
         {
@@ -625,8 +693,11 @@ async def create_plate(request: Request):
 
 @app.post("/plate")
 async def save_plate(plate: Plate):
-    if check_if_exists(plate.barcode, '/Sample plates'):
-        return {'detail': f'Sample plate with barcode {plate.barcode} already exists'}
+    """
+    Uploads the plate metadata to dropbox
+    """
+    if check_if_exists(plate.barcode, "/Sample plates"):
+        return {"detail": f"Sample plate with barcode {plate.barcode} already exists"}
     data = [
         {},
     ]
@@ -636,45 +707,69 @@ async def save_plate(plate: Plate):
         fieldname = PLATE_PROPERTIES_TO_FIELDNAMES["props"][attribute]
         data[0][fieldname] = value
 
-    sample_types = {'Dropcast': 'dc', 'Spuncoat': 'sc'}
-    sample_type = sample_types[plate.props['sample_type']]
+    sample_types = {"Dropcast": "dc", "Spuncoat": "sc"}
+    sample_type = sample_types[plate.props["sample_type"]]
 
     ## find precursors and copy
     initials = get_initials(plate.executer)
     precursor = plate.precursor
-    child_matches = search_keyword(precursor, '/Child vials')
-    new_plate_folder = plate.directory + f'/{plate.date}-{initials}-{plate.barcode}-{sample_type}'
+    child_matches = search_keyword(precursor, "/Child vials")
+    new_plate_folder = (
+        plate.directory + f"/{plate.date}-{initials}-{plate.barcode}-{sample_type}"
+    )
 
     # Create the folders in the new folders
     for folder_name in ("General", "Hyperspectral", "SEM/EDS", "XRD"):
         try:
-            folder_path = new_plate_folder + '/' + folder_name
+            folder_path = new_plate_folder + "/" + folder_name
             dbx.files_create_folder_v2(folder_path)
         except:
             pass
 
+    ### Check if the precursor was a child vial or not
+
+    # if the parent was a child vial, copy from the child vials directiry
     if len(child_matches) == 1:
-        df, path = download(precursor, '/Child vials')
-        child_file_name = path.split('/')[-1]
+        df, path = download(precursor, "/Child vials")
+        child_file_name = path.split("/")[-1]
         try:
-            dbx.files_copy_v2(from_path=path, to_path=new_plate_folder + f'/child-vial-{child_file_name}')
+            dbx.files_copy_v2(
+                from_path=path,
+                to_path=new_plate_folder + f"/child-vial-{child_file_name}",
+            )
         except:
             pass
         parents = df["Parents"].to_list()
         for parent in parents:
-            try:
-                parent_path = search_keyword(parent, '/Parent vials')[0].metadata.get_metadata().path_display
-                parent_file_name = parent_path.split('/')[-1]
-                dbx.files_copy_v2(from_path=parent_path, to_path=new_plate_folder + f'/parent-vial-{parent_file_name}')
-            except:
-                pass
+            parent_path = (
+                search_keyword(parent, "/Parent vials")[0]
+                .metadata.get_metadata()
+                .path_display
+            )
+            parent_file_name = parent_path.split("/")[-1]
+            dbx.files_copy_v2(
+                from_path=parent_path,
+                to_path=new_plate_folder + f"/parent-vial-{parent_file_name}",
+            )
+
+    # otherwise, the precursor should be a parent vial
+    # find the parent vial information and copy to the plate directory
     elif len(child_matches) == 0:
         try:
-            parent_path = search_keyword(precursor, '/Parent vials')[0].metadata.get_metadata().path_display
-            parent_file_name = parent_path.split('/')[-1]
-            dbx.files_copy_v2(from_path=parent_path, to_path=new_plate_folder + f'/parent-vial-{parent_file_name}')
+            parent_path = (
+                search_keyword(precursor, "/Parent vials")[0]
+                .metadata.get_metadata()
+                .path_display
+            )
+            parent_file_name = parent_path.split("/")[-1]
+            dbx.files_copy_v2(
+                from_path=parent_path,
+                to_path=new_plate_folder + f"/parent-vial-{parent_file_name}",
+            )
         except:
-            return {'detail': 'Precursor information not found'}
+            return {"detail": "Precursor information not found"}
+    else:
+        return {"detail": "Multiple precursors found with the same barcode"}
 
     csv_buffer = StringIO()
     writer = csv.DictWriter(csv_buffer, fieldnames=PLATE_FIELDNAMES)
@@ -687,40 +782,47 @@ async def save_plate(plate: Plate):
             csv_buffer, f'/Sample plates/{data[0]["Date"]}_{plate.barcode}.csv'
         )
         upload_csv_buffer_to_path(
-            csv_buffer, new_plate_folder + f'/sample-{data[0]["Date"]}_{plate.barcode}.csv'
+            csv_buffer,
+            new_plate_folder + f'/sample-{data[0]["Date"]}_{plate.barcode}.csv',
         )
         return {"detail": "Uploaded successfully"}
     except Exception as e:
         return {"detail": "Upload failed", "error": e}
 
-@app.get('/plate')
+
+@app.get("/search/plate")
+def search_plate(request: Request):
+    """
+    Returns the page which allows to search the plate barcode
+    """
+    return templates.TemplateResponse("search_plate.html", {"request": request})
+
+
+@app.get("/plate")
 def get_plate(request: Request, plate_barcode):
     """
     Downloads the information related to a sample plate
     """
     df, path = download(plate_barcode, "/Sample plates")
     out = {}
-    out['props'] = {}
-    for property, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES['general'].items():
-        out[property] = df.iloc[0][fieldname]
-    for property, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES['props'].items():
-        out['props'][property] = df.iloc[0][fieldname]
-    precursor = out['precursor']
-    is_child = check_if_exists(precursor, '/Child vials')
-    out['is_child'] = is_child
-    return templates.TemplateResponse('view_plate.html', {'request': request} | out)
+    out["props"] = {}
+    for attribute, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES["general"].items():
+        out[attribute] = df.iloc[0][fieldname]
+    for attribute, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES["props"].items():
+        out["props"][attribute] = df.iloc[0][fieldname]
+    precursor = out["precursor"]
+    is_child = check_if_exists(precursor, "/Child vials")
+    out["is_child"] = is_child
+    return templates.TemplateResponse("view_plate.html", {"request": request} | out)
 
-@app.get('/search-plate')
-def search_plate(request: Request):
-    """
-    Returns the page which allows to search the plate barcode
-    """
-    return templates.TemplateResponse('search_plate.html', {'request': request})
 
 ### Profiles ####
 #################
 @app.get("/profiles", response_class=HTMLResponse)
 async def list_profiles(request: Request):
+    """
+    Renders the page which lists all the saved profiles
+    """
     profiles = list_all_profiles()
     return templates.TemplateResponse(
         "profiles.html", {"request": request, "profiles": profiles}
@@ -734,6 +836,9 @@ async def create_profile(request: Request):
 
 @app.post("/profile")
 def save_profile(profile: Profile):
+    """
+    Uploads the given profile information to dropbox
+    """
     data = [{}]
     data[0]["Name"] = profile.name
     for i, directory in enumerate(profile.parent):
@@ -775,6 +880,9 @@ def list_all_profiles():
 
 
 def download_directories(profile_name):
+    """
+    Returns all directories found under the given profile name
+    """
     path = PARENT_PATH + "/Profiles/" + profile_name + ".csv"
     metadata, response = dbx.files_download(path)
     csv_data = response.content.decode("utf-8")
@@ -793,6 +901,9 @@ def download_directories(profile_name):
 
 @app.get("/profile/{profile_name}", response_class=HTMLResponse)
 async def edit_profile(request: Request, profile_name: str):
+    """
+    Renders the page which allows the user to edit their profile
+    """
     output = download_directories(profile_name)
     return templates.TemplateResponse(
         "edit_profile.html",
@@ -805,10 +916,17 @@ async def edit_profile(request: Request, profile_name: str):
 
 @app.get("/directories")
 def get_directories(profile: str, type: str):
+    """
+    Returns all directories for the given profile for the given type
+    type: either parent, child, or plate
+    """
     return {"directories": download_directories(profile)[type]}
 
 
 def list_all_files(folder_path="/"):
+    """
+    Lists all files in the given folder path in dropbox
+    """
     try:
         result = dbx.files_list_folder(folder_path, recursive=True)
         entries = result.entries

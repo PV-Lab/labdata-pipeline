@@ -73,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 })
 
+// Salts and solvents divd
 // Creates a new form to add an extra salt
 function add_salt(event) {
     const element = event.target;
@@ -154,6 +155,8 @@ function add_solvent(event) {
     solvent_content_div.appendChild(new_solvent_div);
 }
 
+// Creating and sending Parent vial JSON
+
 function create_parent_object() {
     const salts_div = document.querySelector('#salt_content');
     const solvents_div = document.querySelector('#solvent_content');
@@ -208,6 +211,7 @@ function create_parent_object() {
         };
 }
 
+// Checks if the created Parent vial object is valid
 function check_object(object) {
     for (const key in object) {
         if ((key !== 'salts') && (key !== 'solvents')) {
@@ -310,7 +314,7 @@ function search_salt_barcode(event) {
     const spinner = target.parentElement.querySelector('.spinner')
     if (event.key === "Enter") {
         spinner.style.display = 'inline-block';
-        fetch(`/get_salt/${barcode}`)
+        fetch(`/salt/${barcode}`)
         .then((response) => response.json())
         .then((data) => {
             parent_div.querySelector('.salt_name').value = data['name'];
@@ -349,7 +353,7 @@ function search_solvent(event) {
     const spinner = target.parentElement.querySelector('.spinner')
     if (event.key === "Enter") {
         spinner.style.display = 'inline-block';
-        fetch(`/get_solvent/${barcode}`)
+        fetch(`/solvent/${barcode}`)
         .then((response) => response.json())
         .then((data) => {
             parent_div.querySelector('.solvent_name').value = data['name'];
@@ -446,16 +450,46 @@ function add_parent(event) {
     new_div.innerHTML = `Parent barcode: <input class="parent" type="text">`;
     target.parentElement.querySelector('#parents').appendChild(new_div);
 }
+function check_plate(object) {
+    let optional_props = ['notes']
+    for (const key in object) {
+        if (key != 'props' & !(optional_props.includes(key))) {
+            if (object[key] === '') {
+                return {
+                    'status': false,
+                    'empty': key,
+                };
+            };
+        };
+    };
+    for (const key in object.props) {
+        if (!(optional_props.includes(key))) {
+            if (object['props'][key] === '') {
+                return {
+                    'status': false,
+                    'empty': key,
+                };
+            };
+        };
+    };
+    let radios = ['sample_type', 'ozone', 'washed']
+    for (let key of radios) {
+        if (!(key in object.props)) {
+            return {
+                'status': false,
+                'empty': key,
+            };
+        };
+    }
+    return {'status': true};
+}
 
-// Create a plate
-function save_plate() {
+function create_plate_object() {
     plate = {};
     plate['props'] = {};
     general = document.querySelector('#general');
     const general_inputs = general.querySelectorAll('input');
     const props = document.querySelector('#props').querySelectorAll('input');
-    const message_div = document.querySelector('#message');
-    const spinner = message_div.parentElement.querySelector('.spinner');
     general_inputs.forEach(input => {
         plate[input.id] = input.value;
     });
@@ -472,25 +506,37 @@ function save_plate() {
             plate['props'][input.id] = input.value;
         }
     });
-    console.log(plate)
-    spinner.style.display = 'inline-block';
-    fetch('/plate', {
-        'method': 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(plate),
-    })
-    .then((response) => response.json())
-    .then((data) => {
-        console.log(data);
-        if (data.detail === 'Uploaded successfully') {
-            message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
-        } else {
-            message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
-        }
-        spinner.style.display = 'none';
-    });
+    return plate;
+}
+
+// Create a plate
+function save_plate() {
+    const plate = create_plate_object();
+    const check = check_plate(plate);
+    const message_div = document.querySelector('#message');
+    const spinner = message_div.parentElement.querySelector('.spinner');
+    if (check['status']) {
+        spinner.style.display = 'inline-block';
+        fetch('/plate', {
+            'method': 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(plate),
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            console.log(data);
+            if (data.detail === 'Uploaded successfully') {
+                message_div.innerHTML = `<blockquote>${data.detail}</blockquote>`;
+            } else {
+                message_div.innerHTML = `<blockquote class="error">${data.detail}</blockquote>`;
+            }
+            spinner.style.display = 'none';
+        });
+    } else {
+        message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+    }
 }
 
 // Profiles
