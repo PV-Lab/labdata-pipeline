@@ -14,9 +14,9 @@
 <div>
     Precursor vial barcode:
     {% if is_child %}
-    <a href="/view/child?barcode={{ precursor }}">{{ precursor }}</a>
+    <a href="/child?barcode={{ precursor }}">{{ precursor }}</a>
     {% else %}
-    <a href="/parent?parent_barcode={{ precursor }}">{{ precursor }}</a>
+    <a href="/parent?barcode={{ precursor }}">{{ precursor }}</a>
     {% endif %}
 </div>
 </div>
@@ -48,6 +48,9 @@
     {% if props['ozone'] == 'Yes' %}
     Time treated (min): <input type="text" id="ozone_time" value="{{props['ozone_time'] }}">
     {%endif%}
+</div>
+<div>
+    Additional treatment notes: <textarea id="other_treatment">{{ other_treatment }}</textarea>
 </div>
 <div style="display: flex;">
     Sample type:

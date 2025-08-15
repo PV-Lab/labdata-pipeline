@@ -67,8 +67,10 @@ class ParentVial(BaseModel):
     barcode: str
     solvents: list
     salts: list
-    total_volume: int
+    total_volume: float
     directory: str
+    notes: str
+    molarity: float
 
 
 class Child(BaseModel):
@@ -82,6 +84,7 @@ class Child(BaseModel):
     ambient_temp: float
     ambient_humidity: float
     directory: str
+    notes: str
 
 
 class Plate(BaseModel):
@@ -95,6 +98,7 @@ class Plate(BaseModel):
     props: dict
     directory: str
     notes: str
+    other_treatment: str
 
 
 class Profile(BaseModel):
@@ -156,6 +160,7 @@ def download(name, parent_folder="/Parent vials"):
     metadata, response = dbx.files_download(path)
     csv_data = response.content.decode("utf-8")
     df = pd.read_csv(StringIO(csv_data), dtype=str)
+    df = df.fillna('')
     return df, path
 
 
@@ -249,22 +254,21 @@ def get_salt(salt_barcode: str):
             if "Fault" in pub_result and name != "":
                 encoded_name = urllib.parse.quote(name.lower())
                 pub_result = requests.get(
-                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/\
-                        name/{encoded_name}/cids/JSON"
+                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/cids/JSON"
                 ).json()
             if "Fault" not in pub_result:
                 cid = pub_result["IdentifierList"]["CID"][0]
                 response = requests.get(
-                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/\
-                        cid/{cid}/attribute/MolecularWeight,MolecularFormula/JSON"
+                    f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight,MolecularFormula/JSON'
                 ).json()
-                molar_mass = response["PropertyTable"]["Properties"][0][
-                    "MolecularWeight"
-                ]
-                if not chem_form:
-                    chem_form = response["PropertyTable"]["Properties"][0][
-                        "MolecularFormula"
+                if "Fault" not in response:
+                    molar_mass = response["PropertyTable"]["Properties"][0][
+                        "MolecularWeight"
                     ]
+                    if not chem_form:
+                        chem_form = response["PropertyTable"]["Properties"][0][
+                            "MolecularFormula"
+                        ]
         return {
             "name": name,
             "chem_form": chem_form,
@@ -273,7 +277,7 @@ def get_salt(salt_barcode: str):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Salt barcode not found")
+        raise HTTPException(status_code=400, detail=f"Salt barcode not found, {e}")
 
 
 @app.get("/solvent/{solvent_barcode}")
@@ -315,11 +319,14 @@ async def index(request: Request):
 FIELDNAMES = [
     "Date",
     "Executer",
+    "Barcode of Vial",
+    "Desired molarity",
+    "Total volume (ml)",
     "Barcode on the salt",
     "Salt name",
     "Chemical formula",
     "Salt Molecular Weight in g/mol",
-    "Desired molarity",
+    "Stoichiometric ratio",
     "Mass of salt added in the vial in g",
     "Ambient temperature in glovebox (C)",
     "Ambient humidity in glovebox (%)",
@@ -332,8 +339,7 @@ FIELDNAMES = [
     "Ambient humidity (%)",
     "Stir Time (min)",
     "Solvent receipt date",
-    "Barcode of Vial",
-    "Total volume (ml)",
+    "Notes",
     "Save copy to",
 ]
 
@@ -344,17 +350,19 @@ PROPERTIES_TO_FIELDMAMES = {
         "date": "Date",
         "total_volume": "Total volume (ml)",
         "directory": "Save copy to",
+        'notes': "Notes",
+        'molarity': "Desired molarity",
     },
     "salts": {
         "name": "Salt name",
         "barcode": "Barcode on the salt",
+        'ratio': "Stoichiometric ratio",
         "chemical_formula": "Chemical formula",
         "molar_mass": "Salt Molecular Weight in g/mol",
         "mass": "Mass of salt added in the vial in g",
         "ambient_temp": "Ambient temperature in glovebox (C)",
         "ambient_humidity": "Ambient humidity in glovebox (%)",
         "receipt_date": "Salt receipt date",
-        "desired_molarity": "Desired molarity",
     },
     "solvents": {
         "barcode": "Barcode on the solvent",
@@ -478,11 +486,11 @@ async def edit_parent(parent: ParentVial):
 
 # Downloads the parent metadata from dropbox
 @app.get("/parent", response_class=HTMLResponse)
-async def get_parent(request: Request, parent_barcode: str):
+async def get_parent(request: Request, barcode: str):
     """
     Renders the page which allows the user to edit and view parent vial information
     """
-    df, path = download(parent_barcode)
+    df, path = download(barcode)
     output = {}
     salts = []
     solvents = []
@@ -518,6 +526,7 @@ CHILD_FIELDNAMES = [
     "Parents",
     "Ambient temperature (C)",
     "Ambient humidity (%)",
+    "Notes",
     "Save copy to",
 ]
 
@@ -528,6 +537,7 @@ CHILD_PROPERTIES_TO_FIELDNAMES = {
     "ambient_temp": "Ambient temperature (C)",
     "ambient_humidity": "Ambient humidity (%)",
     "directory": "Save copy to",
+    'notes': "Notes",
 }
 
 
@@ -589,7 +599,7 @@ async def search_child(request: Request):
     return templates.TemplateResponse("search_child.html", {"request": request})
 
 
-@app.get("/view/child", response_class=HTMLResponse)
+@app.get("/child", response_class=HTMLResponse)
 async def get_child(request: Request, barcode: str):
     """
     Renders the page which allows the user to view the child vial metadata
@@ -620,6 +630,7 @@ PLATE_FIELDNAMES = [
     "Washed in",
     "Ozone treatment",
     "Ozone treatment time (min)",
+    "Additional treatment notes",
     "Sample type",
     "Dropcast droplet volume (μl)",
     "Dropcasting temperature (C)",
@@ -648,6 +659,7 @@ PLATE_PROPERTIES_TO_FIELDNAMES = {
         "executer": "Executer",
         "precursor": "Precursor vial barcode",
         "directory": "Save copy to",
+        'other_treatment': "Additional treatment notes",
         "notes": "Notes",
     },
     "props": {
@@ -799,11 +811,11 @@ def search_plate(request: Request):
 
 
 @app.get("/plate")
-def get_plate(request: Request, plate_barcode):
+def get_plate(request: Request, barcode):
     """
     Downloads the information related to a sample plate
     """
-    df, path = download(plate_barcode, "/Sample plates")
+    df, path = download(barcode, "/Sample plates")
     out = {}
     out["props"] = {}
     for attribute, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES["general"].items():

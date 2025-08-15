@@ -16,7 +16,7 @@
         {% for parent in parents %}
         <div id="parents">
             <div>
-                Parent barcode: <a href="/parent?parent_barcode={{ parent }}">{{ parent }}</a>
+                Parent barcode: <a href="/parent?barcode={{ parent }}">{{ parent }}</a>
             </div>
         </div>
         {% endfor %}
@@ -28,6 +28,9 @@
 </div>
 <div>
     Ambient humidity (%): <input class="ambient_humidity" type="number" value="{{ ambient_humidity }}">
+</div>
+<div>
+    Notes: <textarea id="notes">{{ notes }}</textarea>
 </div>
 <div>
     Saved copy to: <input class="long-input" value="{{ directory }}" disabled>

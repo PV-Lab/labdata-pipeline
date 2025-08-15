@@ -96,7 +96,7 @@ function add_salt(event) {
             Molar mass (g/mol): <input class="salt_molar_mass" type="number">
         </div>
          <div>
-            Desired molarity (mol/l): <input class="salt_desired_molarity" type="text" inputmode="decimal" oninput="calculate_mass(event)">
+            Stoichiometric ratio: <input class="salt_ratio" type="number" value="1"> <button onclick="calculate_mass(event)">Calculate mass</button> <span class="spinner"></span>
         </div>
         <div>
             Mass (g): <input class="salt_mass" type="number">
@@ -165,6 +165,8 @@ function create_parent_object() {
     const date = document.querySelector('#date').innerHTML;
     const total_volume = document.querySelector('#volume').value;
     const directory = document.querySelector('#directory').value;
+    const notes = document.querySelector('#notes').value;
+    const molarity = document.querySelector('#molarity').value;
     let salts = [];
     let solvents = [];
     salts_div.querySelectorAll('.salt').forEach(function(div) {
@@ -177,7 +179,7 @@ function create_parent_object() {
             name: div.querySelector('.salt_name').value,
             chemical_formula: div.querySelector('.salt_chem_form').value,
             molar_mass: div.querySelector('.salt_molar_mass').value,
-            desired_molarity: div.querySelector('.salt_desired_molarity').value,
+            ratio: div.querySelector('.salt_ratio').value,
             mass: div.querySelector('.salt_mass').value,
             ambient_temp: div.querySelector('.salt_ambient_temp').value,
             ambient_humidity: div.querySelector('.salt_ambient_humidity').value,
@@ -204,10 +206,12 @@ function create_parent_object() {
             date: date,
             executer: executer,
             barcode: barcode,
+            molarity: molarity,
             total_volume: total_volume,
             salts: salts,
             solvents: solvents,
             directory: directory,
+            notes: notes,
         };
 }
 
@@ -215,7 +219,7 @@ function create_parent_object() {
 function check_object(object) {
     for (const key in object) {
         if ((key !== 'salts') && (key !== 'solvents')) {
-            if (object[key] === '') {
+            if (object[key] === '' & key != 'notes') {
                 return {
                     'status': false,
                     'empty': key
@@ -322,7 +326,7 @@ function search_salt_barcode(event) {
             parent_div.querySelector('.salt_molar_mass').value = data['molar_mass'];
             parent_div.querySelector('.salt_receipt_date').value = data['receipt_date'];
             spinner.style.display = 'none';
-            parent_div.querySelector('.salt_desired_molarity').focus();
+            parent_div.querySelector('.salt_ratio').focus();
         })
         .catch((error) => {
             console.log('Error', error)
@@ -335,13 +339,16 @@ function search_salt_barcode(event) {
 function calculate_mass(event) {
     event.preventDefault();
     const target = event.target;
-    const molarity = target.value;
+    const molarity = document.querySelector('#molarity').value;
     const parent_div = target.parentElement.parentElement;
     const spinner = target.parentElement.querySelector('.spinner');
+    const ratio = parent_div.querySelector('.salt_ratio').value;
+    spinner.style.display = 'inline-block';
     const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
     const volume = document.querySelector('#volume').value;
-    parent_div.querySelector('.salt_mass').value = molarity * volume * molar_mass/ 1000;
-    parent_div.querySelector('salt_ambient_temp').focus();
+    parent_div.querySelector('.salt_mass').value = molarity * ratio * volume * molar_mass/ 1000;
+    parent_div.querySelector('.salt_ambient_temp').focus();
+    spinner.style.display = 'none';
 }
 
 function search_solvent(event) {
@@ -370,10 +377,30 @@ function search_solvent(event) {
     }
 }
 
+function create_child() {
+    let child = {};
+    child.parents = [];
+    child.executer = document.querySelector('#executer').value;
+    child.date = document.querySelector('#date').innerHTML;
+    child.directory = document.querySelector('#directory').value;
+    child.notes = document.querySelector('#notes').value;
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+        if (input.className === 'parent') {
+            if (input.value != '') {
+                child['parents'].push(input.value);
+            }
+        } else {
+            child[input.id] = input.value;
+        }
+    });
+    return child;
+}
+
 function check_child(object) {
     for (const key in object) {
         if (key != 'parents') {
-            if (object[key] === '') {
+            if (object[key] === '' & key != 'notes') {
                 return {
                     'status': false,
                     'empty': key,
@@ -388,25 +415,6 @@ function check_child(object) {
         };
     };
     return {'status': true}
-}
-
-function create_child() {
-    let child = {};
-    child.parents = [];
-    child.executer = document.querySelector('#executer').value;
-    child.date = document.querySelector('#date').innerHTML;
-    child.directory = document.querySelector('#directory').value;
-    const inputs = document.querySelectorAll('input');
-    inputs.forEach(input => {
-        if (input.className === 'parent') {
-            if (input.value != '') {
-                child['parents'].push(input.value);
-            }
-        } else {
-            child[input.id] = input.value;
-        }
-    });
-    return child;
 }
 
 function save_child() {
@@ -450,8 +458,35 @@ function add_parent(event) {
     new_div.innerHTML = `Parent barcode: <input class="parent" type="text">`;
     target.parentElement.querySelector('#parents').appendChild(new_div);
 }
+
+function create_plate_object() {
+    plate = {};
+    plate['props'] = {};
+    general = document.querySelector('#general');
+    const general_inputs = general.querySelectorAll('input');
+    const props = document.querySelector('#props').querySelectorAll('input');
+    general_inputs.forEach(input => {
+        plate[input.id] = input.value;
+    });
+    plate.executer = document.querySelector('#executer').value;
+    plate.date = general.querySelector('#date').innerHTML;
+    plate.directory = document.querySelector('#directory').value;
+    plate.notes = document.querySelector('#notes').value;
+    plate.other_treatment = document.querySelector('#other_treatment').value;
+    props.forEach(input => {
+        if (input.type === 'radio' ) {
+            if (input.checked) {
+                plate['props'][input.name] = input.value;
+            }
+        } else {
+            plate['props'][input.id] = input.value;
+        }
+    });
+    return plate;
+}
+
 function check_plate(object) {
-    let optional_props = ['notes']
+    let optional_props = ['notes', 'other_treatment']
     for (const key in object) {
         if (key != 'props' & !(optional_props.includes(key))) {
             if (object[key] === '') {
@@ -482,31 +517,6 @@ function check_plate(object) {
         };
     }
     return {'status': true};
-}
-
-function create_plate_object() {
-    plate = {};
-    plate['props'] = {};
-    general = document.querySelector('#general');
-    const general_inputs = general.querySelectorAll('input');
-    const props = document.querySelector('#props').querySelectorAll('input');
-    general_inputs.forEach(input => {
-        plate[input.id] = input.value;
-    });
-    plate.executer = document.querySelector('#executer').value;
-    plate.date = general.querySelector('#date').innerHTML;
-    plate.directory = document.querySelector('#directory').value;
-    plate.notes = document.querySelector('#notes').value;
-    props.forEach(input => {
-        if (input.type === 'radio' ) {
-            if (input.checked) {
-                plate['props'][input.name] = input.value;
-            }
-        } else {
-            plate['props'][input.id] = input.value;
-        }
-    });
-    return plate;
 }
 
 // Create a plate
