@@ -73,6 +73,21 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 })
 
+window.addEventListener('click', (event) => {
+    try {
+        const popup = document.querySelector('#popup');
+        if (event.target === popup) {
+            close_popup();
+        };
+    } catch (e) {
+        console.error("Error:", e.message);
+    }
+  });
+
+function close_popup() {
+    document.querySelector('#popup').style.display = 'none';
+}
+
 // Salts and solvents divd
 // Creates a new form to add an extra salt
 function add_salt(event) {
@@ -99,7 +114,7 @@ function add_salt(event) {
             Stoichiometric ratio: <input class="salt_ratio" type="number" value="1"> <button onclick="calculate_mass(event)">Calculate mass</button> <span class="spinner"></span>
         </div>
         <div>
-            Mass (g): <input class="salt_mass" type="number">
+            Mass (g): <input class="salt_mass" type="number"> <button onclick="calculate_molarity(event)">Calculate molarity</button> <span class="spinner"></span>
         </div>
         <div>
             Ambient temperature in GB (C): <input class="salt_ambient_temp" type="number">
@@ -239,6 +254,19 @@ function check_object(object) {
             }
         }
     }
+    if (object.solvents.length > 0){
+        let volume = parseFloat(object.total_volume);
+        let total_volume = 0;
+        object.solvents.forEach((solvent) => {
+            total_volume += parseFloat(solvent.vol_added);
+        });
+        if (Math.abs(volume - total_volume) > 1e-5) {
+            return {
+                'status': false,
+                'empty': 'volume',
+            }
+        };
+    };
     return {
         'status': true,
     }
@@ -272,7 +300,11 @@ function save_to_dropbox() {
             console.log('Error', error)
         })
     } else {
-        message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+        if (check['empty'] === 'volume') {
+            message_div.innerHTML = `<blockquote class="error">Solvent volumes don't add up to total volume</blockquote>`;
+        } else {
+            message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+        }
     }
 
 }
@@ -302,10 +334,15 @@ function save_edit() {
             spinner.style.display = 'none';
         })
         .catch((error) => {
+            spinner.style.display = 'none';
             console.log('Error', error)
         })
     } else {
-        message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+        if (check['empty'] === 'volume') {
+            message_div.innerHTML = `<blockquote class="error">Solvent volumes don't add up to total volume</blockquote>`;
+        } else {
+            message_div.innerHTML = `<blockquote class="error">${check['empty']} is empty</blockquote>`;
+        }
     }
 }
 
@@ -319,17 +356,34 @@ function search_salt_barcode(event) {
     if (event.key === "Enter") {
         spinner.style.display = 'inline-block';
         fetch(`/salt/${barcode}`)
-        .then((response) => response.json())
+        .then(async (response) => {
+            if (response.ok) {
+                return response.json()
+            } else {
+                const result = await response.json();
+                throw new Error(result.detail);
+            };
+        })
         .then((data) => {
             parent_div.querySelector('.salt_name').value = data['name'];
             parent_div.querySelector('.salt_chem_form').value = data['chem_form'];
             parent_div.querySelector('.salt_molar_mass').value = data['molar_mass'];
             parent_div.querySelector('.salt_receipt_date').value = data['receipt_date'];
-            spinner.style.display = 'none';
+            for (let key of ['.salt_chem_form', '.salt_molar_mass']) {
+                if (parent_div.querySelector(key).value === '') {
+                    parent_div.querySelector(key).focus();
+                    spinner.style.display = 'none';
+                    return;
+                }
+            }
             parent_div.querySelector('.salt_ratio').focus();
+            spinner.style.display = 'none';
         })
         .catch((error) => {
-            console.log('Error', error)
+            const popup = document.querySelector('#popup');
+            popup.querySelector('#message').innerHTML = error.message;
+            popup.style.display = 'block';
+            spinner.style.display = 'none';
         })
     } else {
         barcode_input.value = barcode + event.key;
@@ -351,6 +405,33 @@ function calculate_mass(event) {
     spinner.style.display = 'none';
 }
 
+function calculate_molarity(event) {
+    event.preventDefault();
+    const target = event.target;
+    const parent_div = target.parentElement.parentElement;
+    const spinner = target.parentElement.querySelector('.spinner');
+    const ratio = parent_div.querySelector('.salt_ratio').value;
+    if (ratio === '') {
+        parent_div.querySelector('.salt_ratio').focus();
+        return;
+    }
+    const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
+    if (molar_mass === '') {
+        parent_div.querySelector('.salt_molar_mass').focus();
+        return;
+    }
+    const volume = document.querySelector('#volume').value;
+    if (volume === '') {
+        document.querySelector('#volume').focus();
+        return;
+    }
+    spinner.style.display = 'inline-block';
+    const mass = parent_div.querySelector('.salt_mass').value;
+    document.querySelector('#molarity').value = mass * 1000 /(ratio * volume * molar_mass);
+    spinner.style.display = 'none';
+    parent_div.querySelector('.salt_ambient_temp').focus();
+}
+
 function search_solvent(event) {
     event.preventDefault();
     target = event.target;
@@ -361,7 +442,14 @@ function search_solvent(event) {
     if (event.key === "Enter") {
         spinner.style.display = 'inline-block';
         fetch(`/solvent/${barcode}`)
-        .then((response) => response.json())
+        .then(async (response) => {
+            if (response.ok) {
+                return response.json()
+            } else {
+                const result = await response.json();
+                throw new Error(result.detail);
+            };
+        })
         .then((data) => {
             parent_div.querySelector('.solvent_name').value = data['name'];
             parent_div.querySelector('.solvent_concentration').value = data['concentration'];
@@ -370,7 +458,10 @@ function search_solvent(event) {
             parent_div.querySelector('.solvent_vol').focus();
         })
         .catch((error) => {
-            console.log('Error', error)
+            const popup = document.querySelector('#popup');
+            popup.querySelector('#message').innerHTML = error.message;
+            popup.style.display = 'block';
+            spinner.style.display = 'none';
         })
     } else {
         barcode_input.value = barcode + event.key;

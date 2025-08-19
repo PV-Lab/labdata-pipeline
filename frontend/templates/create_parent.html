@@ -46,5 +46,15 @@
     <button class="save-button" id="save" onclick="save_to_dropbox()">Save to dropbox</button> <span class="spinner"></span>
 </div>
 
+<!-- Popup -->
+<div id="popup" class="popup-overlay">
+  <div class="popup-box">
+    <div>
+    <span class="close-btn" id="close-popup" onclick="close_popup()" style="float: right;">&times;</span>
+    <h4 style="color: #007559;">Error</h4>
+    </div>
+    <p id="message"></p>
+  </div>
+</div>
 
 {% endblock %}

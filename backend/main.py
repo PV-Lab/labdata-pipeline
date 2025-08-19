@@ -240,7 +240,7 @@ def get_salt(salt_barcode: str):
             params=params, timeout=5
         )
     except requests.exceptions.Timeout:
-        HTTPException(status_code=400, detail="Request time out")
+        raise HTTPException(status_code=400, detail="Request time out")
     try:
         result = response.json()
         cas = result["Table"][0]["cas_num"]
@@ -277,7 +277,7 @@ def get_salt(salt_barcode: str):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Salt barcode not found, {e}")
+        raise HTTPException(status_code=400, detail=f"Salt barcode not found")
 
 
 @app.get("/solvent/{solvent_barcode}")
@@ -286,10 +286,13 @@ def get_solvent(solvent_barcode: str):
     Returns the solvent information from the EHS database
     """
     params = {"AuthKey": CHEMICALS_API_KEY, "barcode": solvent_barcode}
-    response = requests.get(
-        "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
-        params=params,
-    )
+    try:
+        response = requests.get(
+            "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
+            params=params, timeout=5
+        )
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=400, detail="Request time out")
     try:
         result = response.json()
         return {
@@ -744,13 +747,10 @@ async def save_plate(plate: Plate):
     if len(child_matches) == 1:
         df, path = download(precursor, "/Child vials")
         child_file_name = path.split("/")[-1]
-        try:
-            dbx.files_copy_v2(
-                from_path=path,
-                to_path=new_plate_folder + f"/child-vial-{child_file_name}",
-            )
-        except:
-            pass
+        dbx.files_copy_v2(
+            from_path=path,
+            to_path=new_plate_folder + f"/child-vial-{child_file_name}",
+        )
         parents = df["Parents"].to_list()
         for parent in parents:
             parent_path = (
@@ -779,7 +779,7 @@ async def save_plate(plate: Plate):
                 to_path=new_plate_folder + f"/parent-vial-{parent_file_name}",
             )
         except:
-            return {"detail": "Precursor information not found"}
+            return {"detail": "Precursor barcode is not found"}
     else:
         return {"detail": "Multiple precursors found with the same barcode"}
 
