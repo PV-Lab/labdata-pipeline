@@ -244,6 +244,9 @@ def get_salt(salt_barcode: str):
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=400, detail="Request timeout")
+    except requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=400, detail="Connection error")
+
     try:
         result = response.json()
         cas = result["Table"][0]["cas_num"]
@@ -311,7 +314,9 @@ def get_solvent(solvent_barcode: str):
             timeout=5,
         )
     except requests.exceptions.Timeout:
-        raise HTTPException(status_code=400, detail="Request time out")
+        raise HTTPException(status_code=400, detail="Request timeout")
+    except requests.exceptions.ConnectionError:
+        raise HTTPException(status_code=400, detail="Connection error")
     try:
         result = response.json()
         return {
