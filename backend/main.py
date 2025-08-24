@@ -1,20 +1,19 @@
-import urllib.parse
+import os
+import csv
+from datetime import datetime
+from io import StringIO
+import urllib
+import json
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
-import os
 import dropbox
 import dropbox.files
-import csv
-from datetime import datetime
 import pandas as pd
-from io import StringIO
-import numpy as np
 import requests
-import urllib
 
 
 ## get API keys
@@ -62,6 +61,7 @@ class ParentVial(BaseModel):
     """
     model for the parent vial JSON input
     """
+
     date: str
     executer: str
     barcode: str
@@ -77,6 +77,7 @@ class Child(BaseModel):
     """
     model for the Child vial JSON input
     """
+
     barcode: str
     executer: str
     date: str
@@ -91,6 +92,7 @@ class Plate(BaseModel):
     """
     Model for the Plate JSON input
     """
+
     executer: str
     date: str
     barcode: str
@@ -105,6 +107,7 @@ class Profile(BaseModel):
     """
     Model for the profile JSON input
     """
+
     name: str
     parent: list
     child: list
@@ -160,7 +163,6 @@ def download(name, parent_folder="/Parent vials"):
     metadata, response = dbx.files_download(path)
     csv_data = response.content.decode("utf-8")
     df = pd.read_csv(StringIO(csv_data), dtype=str)
-    df = df.fillna('')
     return df, path
 
 
@@ -237,10 +239,11 @@ def get_salt(salt_barcode: str):
     try:
         response = requests.get(
             "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
-            params=params, timeout=5
+            params=params,
+            timeout=5,
         )
     except requests.exceptions.Timeout:
-        raise HTTPException(status_code=400, detail="Request time out")
+        raise HTTPException(status_code=400, detail="Request timeout")
     try:
         result = response.json()
         cas = result["Table"][0]["cas_num"]
@@ -248,19 +251,31 @@ def get_salt(salt_barcode: str):
         chem_form = result["Table"][0]["chemical_formula"]
         molar_mass = ""
         if cas:
-            pub_result = requests.get(
-                f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON"
-            ).json()
+            try:
+                pub_result = requests.get(
+                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{cas}/cids/JSON",
+                    timeout=5,
+                ).json()
+            except requests.exceptions.Timeout:
+                pub_result = {"Fault": "Timeout"}
             if "Fault" in pub_result and name != "":
                 encoded_name = urllib.parse.quote(name.lower())
-                pub_result = requests.get(
-                    f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/cids/JSON"
-                ).json()
+                try:
+                    pub_result = requests.get(
+                        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{encoded_name}/cids/JSON",
+                        timeout=5,
+                    ).json()
+                except requests.exceptions.Timeout:
+                    pub_result = {"Fault": "Timeout"}
             if "Fault" not in pub_result:
                 cid = pub_result["IdentifierList"]["CID"][0]
-                response = requests.get(
-                    f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight,MolecularFormula/JSON'
-                ).json()
+                try:
+                    response = requests.get(
+                        f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/property/MolecularWeight,MolecularFormula/JSON",
+                        timeout=5,
+                    ).json()
+                except requests.exceptions.Timeout:
+                    pub_result = {"Fault": "Timeout"}
                 if "Fault" not in response:
                     molar_mass = response["PropertyTable"]["Properties"][0][
                         "MolecularWeight"
@@ -276,8 +291,11 @@ def get_salt(salt_barcode: str):
             "receipt_date": result["Table"][0]["receipt_date"][:10],
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Salt barcode not found")
+    except json.JSONDecodeError:
+        error = response.text
+        if error == 'Invalid Key':
+            raise HTTPException(status_code=500, detail='Chemical Inventory API Key is invalid')
+        raise HTTPException(status_code=400, detail=error)
 
 
 @app.get("/solvent/{solvent_barcode}")
@@ -289,7 +307,8 @@ def get_solvent(solvent_barcode: str):
     try:
         response = requests.get(
             "https://onsite-prd-app1.mit.edu/ehsa/public/ApiInterface/GetChemicalInventoryData",
-            params=params, timeout=5
+            params=params,
+            timeout=5,
         )
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=400, detail="Request time out")
@@ -300,8 +319,11 @@ def get_solvent(solvent_barcode: str):
             "concentration": result["Table"][0]["concentration"],
             "receipt_date": result["Table"][0]["receipt_date"][:10],
         }
-    except:
-        raise HTTPException(status_code=400, detail="Solvent barcode not found")
+    except json.JSONDecodeError:
+        error = response.text
+        if error == 'Invalid Key':
+            raise HTTPException(status_code=500, detail='Chemical Inventory API Key is invalid')
+        raise HTTPException(status_code=400, detail=error)
 
 
 ### Homepage ####
@@ -353,13 +375,13 @@ PROPERTIES_TO_FIELDMAMES = {
         "date": "Date",
         "total_volume": "Total volume (ml)",
         "directory": "Save copy to",
-        'notes': "Notes",
-        'molarity': "Desired molarity",
+        "notes": "Notes",
+        "molarity": "Desired molarity",
     },
     "salts": {
         "name": "Salt name",
         "barcode": "Barcode on the salt",
-        'ratio': "Stoichiometric ratio",
+        "ratio": "Stoichiometric ratio",
         "chemical_formula": "Chemical formula",
         "molar_mass": "Salt Molecular Weight in g/mol",
         "mass": "Mass of salt added in the vial in g",
@@ -498,7 +520,7 @@ async def get_parent(request: Request, barcode: str):
     salts = []
     solvents = []
     for attribute, fieldname in PROPERTIES_TO_FIELDMAMES["general"].items():
-        output[attribute] = df.iloc[0][fieldname]
+        output[attribute] = df.loc[0, fieldname] if not pd.isna(df.loc[0, fieldname]) else ''
     no_salts = df["Salt name"].count()
     for i in range(no_salts):
         salt = {}
@@ -540,7 +562,7 @@ CHILD_PROPERTIES_TO_FIELDNAMES = {
     "ambient_temp": "Ambient temperature (C)",
     "ambient_humidity": "Ambient humidity (%)",
     "directory": "Save copy to",
-    'notes': "Notes",
+    "notes": "Notes",
 }
 
 
@@ -612,7 +634,7 @@ async def get_child(request: Request, barcode: str):
     output = {}
     output["parents"] = []
     for attribute, fieldname in CHILD_PROPERTIES_TO_FIELDNAMES.items():
-        output[attribute] = df.iloc[0][fieldname]
+        output[attribute] = df.loc[0, fieldname] if not pd.isna(df.loc[0, fieldname]) else ''
     no_parents = df["Parents"].count()
     for i in range(no_parents):
         output["parents"].append(df.iloc[i]["Parents"])
@@ -662,7 +684,7 @@ PLATE_PROPERTIES_TO_FIELDNAMES = {
         "executer": "Executer",
         "precursor": "Precursor vial barcode",
         "directory": "Save copy to",
-        'other_treatment': "Additional treatment notes",
+        "other_treatment": "Additional treatment notes",
         "notes": "Notes",
     },
     "props": {
@@ -735,11 +757,8 @@ async def save_plate(plate: Plate):
 
     # Create the folders in the new folders
     for folder_name in ("General", "Hyperspectral", "SEM/EDS", "XRD"):
-        try:
-            folder_path = new_plate_folder + "/" + folder_name
-            dbx.files_create_folder_v2(folder_path)
-        except:
-            pass
+        folder_path = new_plate_folder + "/" + folder_name
+        dbx.files_create_folder_v2(folder_path)
 
     ### Check if the precursor was a child vial or not
 
@@ -819,7 +838,7 @@ def get_plate(request: Request, barcode):
     out = {}
     out["props"] = {}
     for attribute, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES["general"].items():
-        out[attribute] = df.iloc[0][fieldname]
+        out[attribute] = df.loc[0, fieldname] if not pd.isna(df.loc[0, fieldname]) else ''
     for attribute, fieldname in PLATE_PROPERTIES_TO_FIELDNAMES["props"].items():
         out["props"][attribute] = df.iloc[0][fieldname]
     precursor = out["precursor"]
@@ -843,6 +862,9 @@ async def list_profiles(request: Request):
 
 @app.get("/create-profile", response_class=HTMLResponse)
 async def create_profile(request: Request):
+    """
+    Renders the page that allows user to create profile
+    """
     return templates.TemplateResponse("create_profile.html", {"request": request})
 
 
@@ -927,34 +949,9 @@ async def edit_profile(request: Request, profile_name: str):
 
 
 @app.get("/directories")
-def get_directories(profile: str, type: str):
+def get_directories(profile: str, input_type: str):
     """
     Returns all directories for the given profile for the given type
     type: either parent, child, or plate
     """
-    return {"directories": download_directories(profile)[type]}
-
-
-def list_all_files(folder_path="/"):
-    """
-    Lists all files in the given folder path in dropbox
-    """
-    try:
-        result = dbx.files_list_folder(folder_path, recursive=True)
-        entries = result.entries
-
-        # Continue if more results are available
-        while result.has_more:
-            result = dbx.files_list_folder_continue(result.cursor)
-            entries.extend(result.entries)
-
-        # Filter for files only
-        files = [
-            entry for entry in entries if isinstance(entry, dropbox.files.FileMetadata)
-        ]
-        for file in files:
-            print(file.name, "→", file.path_lower)
-
-    except dropbox.exceptions.ApiError as e:
-        print("Error listing files:", e)
-        return []
+    return {"directories": download_directories(profile)[input_type]}

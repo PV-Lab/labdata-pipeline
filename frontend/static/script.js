@@ -261,6 +261,8 @@ function check_object(object) {
             total_volume += parseFloat(solvent.vol_added);
         });
         if (Math.abs(volume - total_volume) > 1e-5) {
+            console.log(volume);
+            console.log(total_volume);
             return {
                 'status': false,
                 'empty': 'volume',
@@ -382,6 +384,7 @@ function search_salt_barcode(event) {
         .catch((error) => {
             const popup = document.querySelector('#popup');
             popup.querySelector('#message').innerHTML = error.message;
+            console.log(error.message);
             popup.style.display = 'block';
             spinner.style.display = 'none';
         })
@@ -400,7 +403,8 @@ function calculate_mass(event) {
     spinner.style.display = 'inline-block';
     const molar_mass = parent_div.querySelector('.salt_molar_mass').value;
     const volume = document.querySelector('#volume').value;
-    parent_div.querySelector('.salt_mass').value = molarity * ratio * volume * molar_mass/ 1000;
+    const mass = molarity * ratio * volume * molar_mass/ 1000;
+    parent_div.querySelector('.salt_mass').value = Number(mass.toFixed(4));
     parent_div.querySelector('.salt_ambient_temp').focus();
     spinner.style.display = 'none';
 }
@@ -693,7 +697,7 @@ function handleprofile(profile, type) {
     if (profile != '') {
         const params = new URLSearchParams({
             profile: profile,
-            type: type
+            input_type: type
         });
         fetch(`/directories?${params}`)
         .then(response => response.json())

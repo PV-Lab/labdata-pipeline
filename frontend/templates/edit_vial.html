@@ -99,11 +99,22 @@
     Notes: <textarea id="notes">{{notes}}</textarea>
 </div>
 <div>
-    Saved copy to: <input class="long-input" value="{{ directory }}" disabled>
+    Saved copy to: <input id="directory" class="long-input" value="{{ directory }}" disabled>
 </div>
 <div>
     <div id="message"></div>
     <button id="save" onclick="save_edit()">Save to dropbox</button> <span class="spinner"></span>
+</div>
+
+<!-- Popup -->
+<div id="popup" class="popup-overlay">
+  <div class="popup-box">
+    <div>
+    <span class="close-btn" id="close-popup" onclick="close_popup()" style="float: right;">&times;</span>
+    <h4 style="color: #007559;">Error</h4>
+    </div>
+    <p id="message"></p>
+  </div>
 </div>
 
 {% endblock %}
