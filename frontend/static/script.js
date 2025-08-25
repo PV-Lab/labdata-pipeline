@@ -659,7 +659,8 @@ function remove_directory(event) {
 
 function save_profile() {
     const name = document.querySelector('#name').value;
-    let profile = {'name': name};
+    const ex_name = document.querySelector('#ex_name').value;
+    let profile = {'name': name, 'ex_name': ex_name};
     sections = ['parent', 'child', 'sample']
     sections.forEach((section) => {
         profile[section] = [];

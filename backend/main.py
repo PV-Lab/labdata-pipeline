@@ -107,7 +107,7 @@ class Profile(BaseModel):
     """
     Model for the profile JSON input
     """
-
+    ex_name: str
     name: str
     parent: list
     child: list
@@ -119,7 +119,7 @@ def get_initials(full_name):
     """
     Returns the initials of a name
     """
-    return ".".join([name[0] for name in full_name.split(" ")])
+    return ".".join([name[0] for name in full_name.split(" ")][:2])
 
 
 def upload_file(local_file_path, dropbox_file_path):
@@ -904,7 +904,10 @@ def save_profile(profile: Profile):
     writer.writerows(data)
     csv_buffer.seek(0)
 
+    ex_name = profile.ex_name
     try:
+        if ex_name:
+            delete_file(PARENT_PATH + f"/Profiles/{ex_name}.csv")
         upload_csv_buffer(csv_buffer, f"/Profiles/{profile.name}.csv")
         return {"detail": "Uploaded successfully"}
     except Exception as e:
