@@ -760,11 +760,6 @@ async def save_plate(plate: Plate):
         plate.directory + f"/{plate.date}-{initials}-{plate.barcode}-{sample_type}"
     )
 
-    # Create the folders in the new folders
-    for folder_name in ("General", "Hyperspectral", "SEM/EDS", "XRD"):
-        folder_path = new_plate_folder + "/" + folder_name
-        dbx.files_create_folder_v2(folder_path)
-
     ### Check if the precursor was a child vial or not
 
     # if the parent was a child vial, copy from the child vials directiry
@@ -812,6 +807,11 @@ async def save_plate(plate: Plate):
     writer.writeheader()
     writer.writerows(data)
     csv_buffer.seek(0)
+
+    # Create the folders in the new folders
+    for folder_name in ("General", "Hyperspectral", "SEM/EDS", "XRD"):
+        folder_path = new_plate_folder + "/" + folder_name
+        dbx.files_create_folder_v2(folder_path)
 
     try:
         upload_csv_buffer(
